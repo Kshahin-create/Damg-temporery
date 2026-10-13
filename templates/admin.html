@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}لوحة الإدارة{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block nav %}
+  <a class="btn light" href="{{ url_for('admin_home') }}">⚙️ الأيام والإعدادات</a>
+  <a class="btn gold" href="{{ url_for('admin_list') }}">📋 كل الطلبات</a>
+  <form method="post" action="{{ url_for('admin_logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn outline" type="submit">تسجيل الخروج</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="stats">
+  <div><small>إجمالي الطلبات</small><strong>{{ total }}</strong></div>
+  <div><small>التسجيل الآن على يوم</small><strong>{{ fmt_day(open_day) if open_day else 'مغلق' }}</strong></div>
+  <form method="get" action="{{ url_for('admin_list') }}" class="search">
+    <input name="q" autofocus placeholder="امسح باركود الإيصال أو اكتب رقم التسجيل">
+    <button class="btn" type="submit">بحث</button>
+  </form>
+  <a class="btn primary" href="{{ url_for('admin_export') }}">تصدير Excel لكل الأيام</a>
+</div>
+
+<form method="post" action="{{ url_for('admin_settings') }}" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2 class="plain">إعدادات الاستقبال</h2>
+
+  <div class="field-title">أيام استقبال الأوراق</div>
+  <div class="days-pick">
+    {% for d in weekday_order %}
+      <label><input type="checkbox" name="weekdays" value="{{ d }}" {% if d in settings.weekdays %}checked{% endif %}><span>{{ weekday_names[d] }}</span></label>
+    {% endfor %}
+  </div>
+
+  <div class="grid four">
+    <label>العدد لكل يوم
+      <input type="number" name="capacity" min="1" max="5000" value="{{ settings.capacity }}" required>
+    </label>
+    <label>بداية العمل
+      <input type="time" name="start" value="{{ settings.start }}" required>
+    </label>
+    <label>نهاية العمل
+      <input type="time" name="end" value="{{ settings.end }}" required>
+    </label>
+    <label>مدة الفترة (دقيقة)
+      <input type="number" name="slot_minutes" min="5" max="120" value="{{ settings.slot_minutes }}" required>
+    </label>
+  </div>
+
+  <label class="switch"><input type="checkbox" name="is_open" {% if settings.is_open %}checked{% endif %}> استقبال طلبات جديدة (الفورم مفتوح)</label>
+  <button class="btn primary" type="submit">حفظ الإعدادات</button>
+  <p class="hint">يوزَّع عدد اليوم بالتساوي على فترات العمل. تغيير الإعدادات لا يغيّر مواعيد من سجّلوا بالفعل.</p>
+</form>
+
+<div class="card">
+  <h2 class="plain">الأيام</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>اليوم</th><th>المسجلون</th><th>عدد خاص لهذا اليوم</th><th>إيقاف اليوم</th><th></th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="{{ 'past' if row.past }}">
+          <td><strong>{{ fmt_day(row.day) }}</strong></td>
+          <td>
+            <span class="pill {{ 'full' if row.capacity and row.count >= row.capacity }}">{{ row.count }} / {{ row.capacity }}</span>
+          </td>
+          <td colspan="3">
+            <form method="post" action="{{ url_for('admin_day_update', day=row.day) }}" class="row-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="number" name="capacity" min="0" max="5000" value="{{ row.custom if row.custom is not none else '' }}" placeholder="{{ settings.capacity }}">
+              <label class="switch"><input type="checkbox" name="closed" {% if row.closed %}checked{% endif %}> مغلق</label>
+              <button class="btn small" type="submit">حفظ</button>
+            </form>
+          </td>
+          <td class="actions">
+            <a class="btn small" href="{{ url_for('admin_list', day=row.day) }}">عرض</a>
+            <a class="btn small" href="{{ url_for('admin_export', day=row.day) }}">Excel</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">اترك «عدد خاص» فارغًا لاستخدام العدد العام. عند اكتمال اليوم ينتقل التسجيل تلقائيًا لليوم التالي.</p>
+</div>
+{% endblock %}

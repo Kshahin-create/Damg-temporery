@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}موعد الحضور{% endblock %}
+{% block content %}
+{# ---------- العرض على الشاشة ---------- #}
+{% if stopped %}<div class="alert danger">هذا الطلب موقوف ولم يعد موعده ساريًا. يمكنك تسجيل طلب جديد.</div>
+{% elif expired %}<div class="alert danger">انتهى موعد هذا الطلب. يمكنك تسجيل طلب جديد.</div>{% endif %}
+<div class="ticket card screen-only">
+  <div class="ticket-head">
+    <span class="ok">✓</span>
+    <h1>تم تسجيل الطلب</h1>
+    <p>{{ r['student_name'] }}</p>
+  </div>
+
+  <div class="ticket-code">
+    <small>رقم التسجيل</small>
+    <strong dir="ltr">{{ r['code'] }}</strong>
+    <div class="barcode">{{ barcode }}</div>
+  </div>
+
+  <div class="ticket-when">
+    <div>
+      <small>يوم الحضور</small>
+      <strong>{{ fmt_day(r['day']) }}</strong>
+    </div>
+    <div>
+      <small>وقت الحضور</small>
+      <strong>من {{ fmt_time(r['slot_start']) }} إلى {{ fmt_time(r['slot_end']) }}</strong>
+    </div>
+  </div>
+
+  <dl class="ticket-info">
+    <div><dt>الإدارة التعليمية</dt><dd>{{ r['administration'] }}</dd></div>
+    <div><dt>المدرسة</dt><dd>{{ r['school'] }}</dd></div>
+    <div><dt>الصف</dt><dd>{{ r['grade'] }}</dd></div>
+    <div><dt>ولي الأمر</dt><dd>{{ r['guardian_name'] }}</dd></div>
+    <div><dt>نوع الإعاقة</dt><dd>{{ r['disability'] }}</dd></div>
+    <div><dt>درجة الذكاء</dt><dd>{{ r['iq_score'] if r['iq_score'] is not none else '—' }}</dd></div>
+  </dl>
+
+  <div class="docs">
+    <h3>الأوراق المطلوبة عند الحضور</h3>
+    <ul>{% for item in documents %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% if requirements %}<p><strong>شروط الحالة:</strong> {{ requirements }}</p>{% endif %}
+  </div>
+
+  <p class="hint">اطبع إيصال الحجز وأحضره معك مع الأوراق في الموعد المحدد.</p>
+  {% if stopped or expired %}<a class="btn primary big" href="{{ url_for('index') }}">تسجيل طلب جديد</a>
+  {% else %}<button class="btn primary big" onclick="window.print()">🖨️ طباعة إيصال الحجز (A4)</button>{% endif %}
+</div>
+
+{# ---------- ورقة الطباعة A4 ---------- #}
+<article class="a4">
+  <header class="a4-head">
+    <div class="a4-org">
+      <strong>وزارة التربية والتعليم والتعليم الفني</strong>
+      <span>مديرية التربية والتعليم بالقليوبية</span>
+      <span>إدارة الدمج التعليمي الشامل</span>
+    </div>
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="">
+    <div class="a4-meta">
+      <span>العام الدراسي: <b>{{ year }}</b></span>
+      <span>تاريخ التسجيل: <b dir="ltr">{{ r['created_at'] }}</b></span>
+    </div>
+  </header>
+
+  <h1 class="a4-title">إيصال حجز موعد تقديم أوراق طلب دمج</h1>
+
+  <section class="a4-top">
+    <div class="a4-barcode">
+      {{ barcode }}
+      <strong dir="ltr">{{ r['code'] }}</strong>
+      <small>رقم التسجيل</small>
+    </div>
+    <div class="a4-when">
+      <div><small>يوم الحضور</small><strong>{{ fmt_day(r['day']) }}</strong></div>
+      <div><small>وقت الحضور</small><strong>من {{ fmt_time(r['slot_start']) }} إلى {{ fmt_time(r['slot_end']) }}</strong></div>
+      <div><small>رقم الدور في اليوم</small><strong>{{ r['seq'] }}</strong></div>
+    </div>
+  </section>
+
+  <h2>بيانات الطالب</h2>
+  <table class="a4-table">
+    <tr><th>اسم الطالب</th><td colspan="3">{{ r['student_name'] }}</td></tr>
+    <tr><th>الرقم القومي</th><td dir="ltr">{{ r['student_nid'] }}</td><th>تاريخ الميلاد</th><td dir="ltr">{{ r['birth_date'] }}</td></tr>
+    <tr><th>النوع</th><td>{{ r['gender'] }}</td><th>الإدارة التعليمية</th><td>{{ r['administration'] }}</td></tr>
+    <tr><th>المدرسة</th><td>{{ r['school'] }}</td><th>الصف الدراسي</th><td>{{ r['grade'] }}</td></tr>
+    <tr><th>نوع الإعاقة</th><td>{{ r['disability'] }}</td><th>درجة الذكاء</th><td>{{ r['iq_score'] if r['iq_score'] is not none else '—' }}</td></tr>
+  </table>
+
+  <h2>بيانات ولي الأمر</h2>
+  <table class="a4-table">
+    <tr><th>اسم ولي الأمر</th><td>{{ r['guardian_name'] }}</td><th>صلة القرابة</th><td>{{ r['relation'] }}</td></tr>
+    <tr><th>رقم الهاتف</th><td dir="ltr">{{ r['phone'] }}</td><th>الرقم القومي</th><td dir="ltr">{{ r['guardian_nid'] or '—' }}</td></tr>
+  </table>
+
+  <h2>الأوراق المطلوب إحضارها</h2>
+  <ul class="a4-docs">
+    {% for item in documents %}<li><i></i>{{ item }}</li>{% endfor %}
+  </ul>
+  {% if requirements %}<p class="a4-req"><b>شروط الحالة:</b> {{ requirements }}</p>{% endif %}
+
+  <footer class="a4-foot">
+    <p>يُرجى الحضور في الموعد المحدد ومعك هذا الإيصال وأصول وصور الأوراق المطلوبة.</p>
+    <div class="a4-sign">
+      <span>توقيع ولي الأمر: ............................</span>
+      <span>مسؤول الاستلام: ............................</span>
+    </div>
+  </footer>
+</article>
+{% endblock %}

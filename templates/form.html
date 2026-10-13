@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}طلب دمج{% endblock %}
+
+{% macro err(name) %}{% if errors.get(name) %}<span class="err">{{ errors[name] }}</span>{% endif %}{% endmacro %}
+{% macro cls(name) %}{% if errors.get(name) %} invalid{% endif %}{% endmacro %}
+{% macro opt() %}<em>اختياري</em>{% endmacro %}
+
+{% block content %}
+<section class="hero">
+  <h1>طلب دمج</h1>
+  <p>سجّل بيانات الطالب لتحصل على رقم التسجيل وموعد الحضور لتقديم الأوراق.</p>
+</section>
+
+{% if open_day %}
+  <div class="next-day">
+    <span>التسجيل الآن لحضور يوم</span>
+    <strong>{{ fmt_day(open_day) }}</strong>
+  </div>
+
+  {% if errors %}<div class="alert danger">برجاء مراجعة الحقول المظللة بالأحمر.</div>{% endif %}
+
+  <form method="post" class="card" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <h2><span>1</span> بيانات الطالب</h2>
+    <div class="grid">
+      <label class="full{{ cls('student_name') }}">اسم الطالب رباعيًا
+        <input name="student_name" value="{{ form.get('student_name', '') }}" maxlength="120" required autocomplete="off">
+        {{ err('student_name') }}
+      </label>
+      <label class="full{{ cls('student_nid') }}">الرقم القومي للطالب
+        <input name="student_nid" value="{{ form.get('student_nid', '') }}" inputmode="numeric" maxlength="14" dir="ltr" placeholder="14 رقمًا من شهادة الميلاد" required autocomplete="off">
+        <span class="note">يُستخرج تاريخ الميلاد والنوع من الرقم القومي تلقائيًا.</span>
+        {{ err('student_nid') }}
+      </label>
+      <label class="{{ cls('city') }}">المدينة أو المركز
+        <input required name="city" value="{{ form.get('city', '') }}" maxlength="100" autocomplete="off">
+        {{ err('city') }}
+      </label>
+      <label class="{{ cls('address') }}">العنوان
+        <input required name="address" value="{{ form.get('address', '') }}" maxlength="300" autocomplete="off">
+        {{ err('address') }}
+      </label>
+    </div>
+
+    <h2><span>2</span> بيانات المدرسة</h2>
+    <div class="grid">
+      <label class="{{ cls('administration') }}">الإدارة التعليمية
+        <select name="administration" required>
+          <option value="">— اختر —</option>
+          {% for item in administrations %}<option {% if form.get('administration') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select>
+        {{ err('administration') }}
+      </label>
+      <label class="{{ cls('grade') }}">الصف الدراسي
+        <select name="grade" required>
+          <option value="">— اختر —</option>
+          {% for stage, grades in stages %}
+            <optgroup label="{{ stage }}">
+              {% for item in grades %}<option {% if form.get('grade') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+            </optgroup>
+          {% endfor %}
+        </select>
+        {{ err('grade') }}
+      </label>
+      <label class="full{{ cls('school') }}">المدرسة
+        <input name="school" value="{{ form.get('school', '') }}" maxlength="150" required autocomplete="off">
+        {{ err('school') }}
+      </label>
+    </div>
+
+    <h2><span>3</span> بيانات الحالة</h2>
+    <div class="grid">
+      <label class="{{ cls('disability') }}">نوع الإعاقة
+        <select name="disability" id="disability" required>
+          <option value="">— اختر —</option>
+          {% for name, rule in disabilities.items() %}
+            <option data-iq="{{ rule.iq or '' }}" data-req="{{ rule.req }}" {% if form.get('disability') == name %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        {{ err('disability') }}
+      </label>
+      <label class="{{ cls('iq_score') }}">درجة الذكاء <em id="iq-label"></em>
+        <input required name="iq_score" value="{{ form.get('iq_score', '') }}" inputmode="numeric" maxlength="3" dir="ltr" autocomplete="off">
+        <span class="note">الدرجة الكلية على مقياس ستانفورد بينيه (لطيف التوحد: الجانب الأدائي).</span>
+        {{ err('iq_score') }}
+      </label>
+      <div class="full rule" id="rule" hidden>
+        <strong>شروط قبول هذه الحالة</strong>
+        <p id="rule-text"></p>
+      </div>
+      <label class="full{{ cls('condition_description') }}">وصف الحالة {{ opt() }}
+        <textarea name="condition_description" rows="3" maxlength="1000">{{ form.get('condition_description', '') }}</textarea>
+        {{ err('condition_description') }}
+      </label>
+      <label class="{{ cls('report_date') }}">تاريخ التقرير
+        <input required type="date" name="report_date" value="{{ form.get('report_date', '') }}">
+        {{ err('report_date') }}
+      </label>
+      <label class="{{ cls('report_authority') }}">جهة إصدار التقرير
+        <input required name="report_authority" value="{{ form.get('report_authority', '') }}" maxlength="200" autocomplete="off">
+        {{ err('report_authority') }}
+      </label>
+    </div>
+
+    <h2><span>4</span> بيانات ولي الأمر</h2>
+    <div class="grid">
+      <label class="{{ cls('guardian_name') }}">اسم ولي الأمر
+        <input name="guardian_name" value="{{ form.get('guardian_name', '') }}" maxlength="120" required autocomplete="off">
+        {{ err('guardian_name') }}
+      </label>
+      <label class="{{ cls('relation') }}">صلة القرابة
+        <select name="relation" id="relation" required>
+          <option value="">— اختر —</option>
+          {% for item in relations %}<option {% if form.get('relation') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select>
+        {{ err('relation') }}
+      </label>
+      <label class="{{ cls('phone') }}">رقم الهاتف
+        <input name="phone" value="{{ form.get('phone', '') }}" inputmode="numeric" maxlength="11" dir="ltr" placeholder="01XXXXXXXXX" required autocomplete="off">
+        {{ err('phone') }}
+      </label>
+      <label class="{{ cls('whatsapp') }}">رقم واتساب {{ opt() }}
+        <input name="whatsapp" value="{{ form.get('whatsapp', '') }}" inputmode="numeric" maxlength="11" dir="ltr" placeholder="01XXXXXXXXX" autocomplete="off">
+        {{ err('whatsapp') }}
+      </label>
+      <label class="{{ cls('guardian_nid') }}">الرقم القومي لولي الأمر
+        <input required name="guardian_nid" value="{{ form.get('guardian_nid', '') }}" inputmode="numeric" maxlength="14" dir="ltr" autocomplete="off">
+        {{ err('guardian_nid') }}
+      </label>
+      <label class="{{ cls('email') }}">البريد الإلكتروني {{ opt() }}
+        <input type="email" name="email" value="{{ form.get('email', '') }}" maxlength="150" dir="ltr" autocomplete="off">
+        {{ err('email') }}
+      </label>
+    </div>
+
+    <h2><span>5</span> بيانات الأب والأم</h2>
+    <div class="grid">
+      <label class="{{ cls('father_name') }}">اسم الأب رباعيًا
+        <input required name="father_name" value="{{ form.get('father_name', '') }}" maxlength="120" autocomplete="off">
+        {{ err('father_name') }}
+      </label>
+      <label class="{{ cls('father_nid') }}">الرقم القومي للأب
+        <input required name="father_nid" value="{{ form.get('father_nid', '') }}" inputmode="numeric" maxlength="14" dir="ltr" autocomplete="off">
+        {{ err('father_nid') }}
+      </label>
+      <label class="{{ cls('mother_name') }}">اسم الأم رباعيًا
+        <input required name="mother_name" value="{{ form.get('mother_name', '') }}" maxlength="120" autocomplete="off">
+        {{ err('mother_name') }}
+      </label>
+      <label class="{{ cls('mother_nid') }}">الرقم القومي للأم
+        <input required name="mother_nid" value="{{ form.get('mother_nid', '') }}" inputmode="numeric" maxlength="14" dir="ltr" autocomplete="off">
+        {{ err('mother_nid') }}
+      </label>
+    </div>
+
+    <button class="btn primary big" type="submit">تسجيل الطلب وحجز الموعد</button>
+    <p class="hint">يُحدَّد يوم ووقت الحضور تلقائيًا ويظهر لك فور التسجيل.</p>
+  </form>
+
+  <div class="card notes">
+    <h3>ملاحظات مهمة</h3>
+    <ul>{% for item in notes %}<li>{{ item }}</li>{% endfor %}</ul>
+  </div>
+{% else %}
+  <div class="card center">
+    <h2 class="plain">التسجيل مغلق حاليًا</h2>
+    <p>لا توجد مواعيد متاحة الآن. برجاء المحاولة لاحقًا.</p>
+    <a class="btn" href="{{ url_for('lookup') }}">استعلام عن موعد مسجل</a>
+  </div>
+{% endif %}
+
+<script>
+  document.querySelectorAll('input[inputmode="numeric"]').forEach(function (input) {
+    input.addEventListener('input', function () {
+      var map = '٠١٢٣٤٥٦٧٨٩';
+      input.value = input.value.replace(/[٠-٩]/g, function (d) { return map.indexOf(d); }).replace(/\D/g, '');
+    });
+  });
+
+  var disability = document.getElementById('disability');
+  function showRule() {
+    var option = disability.selectedOptions[0];
+    var iq = option ? option.dataset.iq : '';
+    var req = option ? option.dataset.req : '';
+    document.getElementById('iq-label').textContent = !option || !option.value ? '' : (iq ? 'المطلوب: ' + iq : (option.value === 'غير ذلك' ? 'اختياري' : ''));
+    document.getElementById('rule').hidden = !req;
+    document.getElementById('rule-text').textContent = req || '';
+  }
+  if (disability) { disability.addEventListener('change', showRule); showRule(); }
+
+  // ولي الأمر هو الأب أو الأم: انسخ بياناته تلقائيًا
+  var relation = document.getElementById('relation');
+  function field(name) { return document.querySelector('[name="' + name + '"]'); }
+  function syncParent() {
+    var parent = { 'الأب': 'father', 'الأم': 'mother' }[relation.value];
+    if (!parent) return;
+    field(parent + '_name').value = field('guardian_name').value;
+    field(parent + '_nid').value = field('guardian_nid').value;
+  }
+  if (relation) [relation, field('guardian_name'), field('guardian_nid')].forEach(function (el) {
+    el.addEventListener('input', syncParent); el.addEventListener('change', syncParent);
+  });
+
+  var form = document.querySelector('form.card');
+  if (form) form.addEventListener('submit', function () {
+    var button = form.querySelector('button[type=submit]');
+    button.disabled = true; button.textContent = 'جارٍ التسجيل…';
+  });
+</script>
+{% endblock %}

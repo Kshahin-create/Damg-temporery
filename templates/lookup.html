@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}استعلام عن موعد{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>استعلام عن موعد</h1>
+  <p>أدخل الرقم القومي للطالب ورقم الهاتف المسجل.</p>
+</section>
+
+{% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
+
+<form method="post" class="card narrow">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid">
+    <label class="full">الرقم القومي للطالب
+      <input name="student_nid" value="{{ form.get('student_nid', '') }}" inputmode="numeric" maxlength="14" dir="ltr" required autocomplete="off">
+    </label>
+    <label class="full">رقم الهاتف
+      <input name="phone" value="{{ form.get('phone', '') }}" inputmode="numeric" maxlength="11" dir="ltr" placeholder="01XXXXXXXXX" required autocomplete="off">
+    </label>
+  </div>
+  <button class="btn primary big" type="submit">عرض الموعد</button>
+</form>
+{% endblock %}

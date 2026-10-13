@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}دخول الإدارة{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+<section class="hero"><h1>دخول الإدارة</h1></section>
+{% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
+<form method="post" class="card narrow">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid">
+    <label class="full">كلمة المرور
+      <input type="password" name="password" required autofocus autocomplete="current-password">
+    </label>
+  </div>
+  <button class="btn primary big" type="submit">دخول</button>
+</form>
+{% endblock %}

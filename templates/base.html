@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B2463">
+  <title>{% block title %}طلب دمج{% endblock %} — منظومة خدمات طلاب الدمج بالقليوبية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="topbar">
+    <div class="wrap">
+      <span>🇪🇬 جمهورية مصر العربية — وزارة التربية والتعليم والتعليم الفني — محافظة القليوبية</span>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="wrap header-main">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="شعار منظومة طلاب الدمج" width="52" height="52">
+        <span class="brand-title">منظومة خدمات طلاب الدمج</span>
+      </a>
+      <nav class="header-actions">{% block nav %}
+        <a class="btn light" href="{{ url_for('index') }}">📝 طلب جديد</a>
+        <a class="btn gold" href="{{ url_for('lookup') }}">🔍 استعلام عن موعد</a>
+      {% endblock %}</nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    {% with messages = get_flashed_messages() %}
+      {% for message in messages %}<div class="alert info">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-in">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="" width="56" height="56" loading="lazy">
+      <div>
+        <strong>منظومة خدمات طلاب الدمج</strong>
+        <span>إدارة الدمج التعليمي الشامل — مديرية التربية والتعليم بالقليوبية</span>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span class="copyright">© <strong>جميع الحقوق محفوظة — مديرية التربية والتعليم بالقليوبية</strong></span>
+      <span>💻 تطوير وبرمجة الطالب: <a href="https://www.facebook.com/hussin.aboslman" target="_blank" rel="noopener noreferrer">حسين يحيي حسين</a></span>
+    </div>
+  </footer>
+</body>
+</html>

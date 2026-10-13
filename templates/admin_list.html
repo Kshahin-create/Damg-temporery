@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}الطلبات{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block nav %}
+  <a class="btn light" href="{{ url_for('admin_home') }}">⚙️ الأيام والإعدادات</a>
+  <a class="btn gold" href="{{ url_for('admin_list') }}">📋 كل الطلبات</a>
+  <form method="post" action="{{ url_for('admin_logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn outline" type="submit">تسجيل الخروج</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="stats">
+  <div><small>{{ fmt_day(day) if day else 'كل الأيام' }}</small><strong>{{ rows|length }} طلب</strong></div>
+  <form method="get" class="search">
+    {% if day %}<input type="hidden" name="day" value="{{ day }}">{% endif %}
+    <input name="q" value="{{ q }}" autofocus placeholder="امسح الباركود أو ابحث بالاسم / الرقم القومي / الهاتف / رقم التسجيل">
+    <button class="btn" type="submit">بحث</button>
+  </form>
+  <a class="btn primary" href="{{ url_for('admin_export', day=day) if day else url_for('admin_export') }}">تصدير Excel</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>رقم التسجيل</th><th>الحالة</th>{% if not day %}<th>اليوم</th>{% endif %}<th>الموعد</th><th>الطالب</th><th>الرقم القومي</th>
+          <th>الإدارة</th><th>المدرسة</th><th>الصف</th><th>الإعاقة</th><th>الذكاء</th><th>ولي الأمر</th><th>الهاتف</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="{{ 'past' if r['status'] == 'stopped' }}">
+          <td dir="ltr"><strong>{{ r['code'] }}</strong></td>
+          <td>
+            {% if r['status'] == 'stopped' %}<span class="pill full">موقوف</span>
+            {% elif r['day'] < today %}<span class="pill old">قديم</span>
+            {% else %}<span class="pill">ساري</span>{% endif %}
+          </td>
+          {% if not day %}<td>{{ fmt_day(r['day']) }}</td>{% endif %}
+          <td class="nowrap">{{ fmt_time(r['slot_start']) }}</td>
+          <td>{{ r['student_name'] }}</td>
+          <td dir="ltr">{{ r['student_nid'] }}</td>
+          <td>{{ r['administration'] }}</td>
+          <td>{{ r['school'] }}</td>
+          <td>{{ r['grade'] }}</td>
+          <td>{{ r['disability'] }}</td>
+          <td>{{ r['iq_score'] if r['iq_score'] is not none else '—' }}</td>
+          <td>{{ r['guardian_name'] }} <small>({{ r['relation'] }})</small></td>
+          <td dir="ltr">{{ r['phone'] }}</td>
+          <td class="actions">
+            {% if r['status'] == 'stopped' %}
+            <form method="post" action="{{ url_for('admin_resume', reg_id=r['id']) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn small" type="submit">إعادة تفعيل</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('admin_stop', reg_id=r['id']) }}" onsubmit="return confirm('إيقاف طلب {{ r['student_name'] }}؟');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn small" type="submit">إيقاف</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin_delete', reg_id=r['id']) }}" onsubmit="return confirm('حذف تسجيل {{ r['student_name'] }}؟');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn small danger" type="submit">حذف</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="14" class="empty">لا توجد طلبات.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
