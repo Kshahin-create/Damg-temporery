@@ -12,6 +12,13 @@
 </section>
 
 {% if open_day %}
+  {% if announcement %}
+  <div class="announce" role="note">
+    <span class="announce-icon" aria-hidden="true">📢</span>
+    <p>{{ announcement }}</p>
+  </div>
+  {% endif %}
+
   <div class="next-day">
     <span>التسجيل الآن لحضور يوم</span>
     <strong>{{ fmt_day(open_day) }}</strong>
@@ -164,14 +171,47 @@
     <ul>{% for item in notes %}<li>{{ item }}</li>{% endfor %}</ul>
   </div>
 {% else %}
-  <div class="card center">
-    <h2 class="plain">التسجيل مغلق حاليًا</h2>
-    <p>لا توجد مواعيد متاحة الآن. برجاء المحاولة لاحقًا.</p>
-    <a class="btn" href="{{ url_for('lookup') }}">استعلام عن موعد مسجل</a>
+  <div class="card closed-card">
+    <div class="closed-icon" aria-hidden="true">{{ '⏸' if closed_reason == 'admin' else '📅' }}</div>
+    {% if closed_reason == 'admin' %}
+      <h2 class="plain">التسجيل مغلق مؤقتًا</h2>
+      <p class="closed-msg">{{ closed_message }}</p>
+      {% if open_at %}
+      <div class="countdown" data-open-at="{{ open_at }}">
+        <small>يفتح التسجيل {{ fmt_datetime(open_at) }}</small>
+        <div class="cd-units" aria-live="polite">
+          <div><b data-u="d">0</b><span>يوم</span></div>
+          <div><b data-u="h">0</b><span>ساعة</span></div>
+          <div><b data-u="m">0</b><span>دقيقة</span></div>
+          <div><b data-u="s">0</b><span>ثانية</span></div>
+        </div>
+      </div>
+      {% endif %}
+    {% else %}
+      <h2 class="plain">اكتملت جميع المواعيد المتاحة حاليًا</h2>
+      <p class="closed-msg">سيتم إتاحة مواعيد جديدة قريبًا. يرجى المحاولة في وقت لاحق.</p>
+    {% endif %}
+    <div class="closed-actions">
+      <a class="btn gold" href="{{ url_for('lookup') }}">🔍 لديك موعد؟ استعلم عنه</a>
+      <button class="btn" type="button" onclick="location.reload()">↻ تحديث الصفحة</button>
+    </div>
   </div>
 {% endif %}
 
 <script>
+  // عدّاد الفتح التلقائي: الوقت المتبقي محسوب من الخادم بتوقيت القاهرة
+  var cd = document.querySelector('.countdown');
+  if (cd) {
+    var deadline = Date.now() + {{ open_in_seconds|default(0) }} * 1000;
+    var tick = function () {
+      var left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      var units = { d: Math.floor(left / 86400), h: Math.floor(left % 86400 / 3600), m: Math.floor(left % 3600 / 60), s: left % 60 };
+      Object.keys(units).forEach(function (k) { cd.querySelector('[data-u="' + k + '"]').textContent = units[k]; });
+      if (left > 0) setTimeout(tick, 1000); else setTimeout(function () { location.reload(); }, 1500);
+    };
+    tick();
+  }
+
   document.querySelectorAll('input[inputmode="numeric"]').forEach(function (input) {
     input.addEventListener('input', function () {
       var map = '٠١٢٣٤٥٦٧٨٩';

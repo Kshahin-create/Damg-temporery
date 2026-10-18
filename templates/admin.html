@@ -11,15 +11,65 @@
 {% endblock %}
 
 {% block content %}
+<div class="kpis">
+  <div><small>طلبات سارية قادمة</small><strong>{{ stats['upcoming'] }}</strong></div>
+  <div><small>مواعيد اليوم</small><strong>{{ stats['today'] }}</strong></div>
+  <div><small>استلام أوراق اليوم</small><strong>{{ stats['received_today'] }}</strong></div>
+  <div><small>إجمالي الأوراق المستلمة</small><strong>{{ stats['received'] }}</strong></div>
+</div>
+
 <div class="stats">
-  <div><small>إجمالي الطلبات</small><strong>{{ total }}</strong></div>
-  <div><small>التسجيل الآن على يوم</small><strong>{{ fmt_day(open_day) if open_day else 'مغلق' }}</strong></div>
   <form method="get" action="{{ url_for('admin_list') }}" class="search">
     <input name="q" autofocus placeholder="امسح باركود الإيصال أو اكتب رقم التسجيل">
     <button class="btn" type="submit">بحث</button>
   </form>
   <a class="btn primary" href="{{ url_for('admin_export') }}">تصدير Excel لكل الأيام</a>
 </div>
+
+<form method="post" action="{{ url_for('admin_intake') }}" class="card intake {{ 'is-open' if open_day else 'is-closed' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="intake-head">
+    <div class="intake-state">
+      <span class="dot"></span>
+      <div>
+        {% if open_day %}
+          <strong>استقبال الطلبات مفتوح</strong>
+          <small>التسجيل الآن على يوم {{ fmt_day(open_day) }}</small>
+        {% elif not settings.is_open %}
+          <strong>استقبال الطلبات متوقف</strong>
+          <small>{% if settings.open_at %}يفتح تلقائيًا {{ fmt_datetime(settings.open_at) }}{% else %}يظهر لأولياء الأمور أن التسجيل مغلق{% endif %}</small>
+        {% else %}
+          <strong>لا توجد مواعيد متاحة</strong>
+          <small>كل الأيام القادمة مكتملة أو موقوفة — زوّد العدد أو أضف أيامًا</small>
+        {% endif %}
+      </div>
+    </div>
+    {% if settings.is_open %}
+      <button class="btn danger-solid" name="action" value="close" type="submit" onclick="return confirm('إيقاف استقبال الطلبات الآن؟');">⏸ إيقاف استقبال الطلبات</button>
+    {% else %}
+      <button class="btn success" name="action" value="open" type="submit">▶ فتح استقبال الطلبات الآن</button>
+    {% endif %}
+  </div>
+
+  <div class="grid">
+    <label>رسالة الإغلاق لأولياء الأمور
+      <textarea name="closed_message" rows="3" maxlength="500" placeholder="التسجيل مغلق مؤقتًا، يرجى المحاولة في وقت آخر.">{{ settings.closed_message }}</textarea>
+      <span class="note">مثال: سيُفتح التسجيل يوم الجمعة الساعة 9 صباحًا. اتركها فارغة لعرض الرسالة الافتراضية.</span>
+    </label>
+    <label>إعلان أعلى الفورم <em>اختياري</em>
+      <textarea name="announcement" rows="3" maxlength="500" placeholder="مثال: يرجى إحضار أصول الأوراق مع الصور.">{{ settings.announcement }}</textarea>
+      <span class="note">يظهر لأولياء الأمور أثناء فتح التسجيل.</span>
+    </label>
+    <label>فتح تلقائي في موعد <em>اختياري</em>
+      <input type="datetime-local" name="open_at" value="{{ settings.open_at }}">
+      <span class="note">عند الإيقاف: يفتح التسجيل وحده في هذا الموعد، ويظهر لأولياء الأمور عدّاد تنازلي.</span>
+    </label>
+  </div>
+  <div class="intake-actions">
+    <button class="btn primary" name="action" value="save" type="submit">حفظ الرسائل</button>
+    <a class="btn" href="{{ url_for('index') }}" target="_blank" rel="noopener">👁 معاينة صفحة أولياء الأمور</a>
+  </div>
+</form>
 
 <form method="post" action="{{ url_for('admin_settings') }}" class="card">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -47,7 +97,6 @@
     </label>
   </div>
 
-  <label class="switch"><input type="checkbox" name="is_open" {% if settings.is_open %}checked{% endif %}> استقبال طلبات جديدة (الفورم مفتوح)</label>
   <button class="btn primary" type="submit">حفظ الإعدادات</button>
   <p class="hint">يوزَّع عدد اليوم بالتساوي على فترات العمل. تغيير الإعدادات لا يغيّر مواعيد من سجّلوا بالفعل.</p>
 </form>

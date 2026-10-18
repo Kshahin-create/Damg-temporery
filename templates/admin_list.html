@@ -21,6 +21,28 @@
   <a class="btn primary" href="{{ url_for('admin_export', day=day) if day else url_for('admin_export') }}">تصدير Excel</a>
 </div>
 
+{% if scanned %}
+<div class="card scan-card {{ 'done' if scanned['received_at'] }}">
+  <div class="scan-main">
+    <span class="scan-code" dir="ltr">{{ scanned['code'] }}</span>
+    <div>
+      <strong>{{ scanned['student_name'] }}</strong>
+      <span>{{ fmt_day(scanned['day']) }} — {{ fmt_time(scanned['slot_start']) }} · {{ scanned['administration'] }} · {{ scanned['disability'] }}</span>
+      {% if scanned['status'] == 'stopped' %}<span class="pill full">هذا الطلب موقوف</span>
+      {% elif scanned['received_at'] %}<span class="pill done">تم استلام الأوراق {{ scanned['received_at'] }}</span>
+      {% elif scanned['day'] != today %}<span class="pill old">موعده ليس اليوم</span>{% endif %}
+    </div>
+  </div>
+  {% if scanned['status'] != 'stopped' and not scanned['received_at'] %}
+  <form method="post" action="{{ url_for('admin_receive', reg_id=scanned['id']) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ url_for('admin_list') }}">
+    <button class="btn success big-inline" type="submit">✔ تأكيد استلام الأوراق</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="card">
   <div class="table-wrap">
     <table>
@@ -38,6 +60,7 @@
             {% if r['status'] == 'stopped' %}<span class="pill full">موقوف</span>
             {% elif r['day'] < today %}<span class="pill old">قديم</span>
             {% else %}<span class="pill">ساري</span>{% endif %}
+            {% if r['received_at'] %}<span class="pill done" title="{{ r['received_at'] }}">استُلمت الأوراق</span>{% endif %}
           </td>
           {% if not day %}<td>{{ fmt_day(r['day']) }}</td>{% endif %}
           <td class="nowrap">{{ fmt_time(r['slot_start']) }}</td>
@@ -51,6 +74,13 @@
           <td>{{ r['guardian_name'] }} <small>({{ r['relation'] }})</small></td>
           <td dir="ltr">{{ r['phone'] }}</td>
           <td class="actions">
+            {% if r['status'] != 'stopped' %}
+            <form method="post" action="{{ url_for('admin_receive', reg_id=r['id']) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn small {{ '' if r['received_at'] else 'success' }}" type="submit">{{ 'إلغاء الاستلام' if r['received_at'] else 'استلام' }}</button>
+            </form>
+            {% endif %}
             {% if r['status'] == 'stopped' %}
             <form method="post" action="{{ url_for('admin_resume', reg_id=r['id']) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

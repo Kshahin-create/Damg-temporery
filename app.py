@@ -220,6 +220,9 @@ DEFAULT_SETTINGS = {
     "end": "14:00",
     "slot_minutes": "15",
     "is_open": "1",
+    "closed_message": "",
+    "open_at": "",
+    "announcement": "",
 }
 LOOKAHEAD_DAYS = 120
 
@@ -277,6 +280,7 @@ EXTRA_COLUMNS = {
     "mother_nid": "TEXT",
     "status": "TEXT NOT NULL DEFAULT 'active'",
     "stopped_at": "TEXT",
+    "received_at": "TEXT",
 }
 
 STATUS_ACTIVE, STATUS_STOPPED = "active", "stopped"
@@ -334,10 +338,26 @@ def init_db() -> None:
     conn.close()
 
 
+DEFAULT_CLOSED_MESSAGE = "التسجيل مغلق مؤقتًا، يرجى المحاولة في وقت آخر."
+
+
+def save_settings(values: dict) -> None:
+    conn = get_db()
+    for key, value in values.items():
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+
+
 def get_settings() -> dict:
     raw = dict(DEFAULT_SETTINGS)
     raw.update({r["key"]: r["value"] for r in get_db().execute("SELECT key, value FROM settings")})
+    # الفتح التلقائي في الموعد الذي حدده المسؤول
+    if raw["is_open"] != "1" and raw["open_at"] and raw["open_at"] <= now_cairo().strftime("%Y-%m-%dT%H:%M"):
+        raw.update(is_open="1", open_at="")
+        save_settings({"is_open": "1", "open_at": ""})
     return {
+        "closed_message": raw["closed_message"],
+        "open_at": raw["open_at"],
+        "announcement": raw["announcement"],
         "weekdays": {int(x) for x in raw["weekdays"].split(",") if x.strip() != ""},
         "capacity": int(raw["capacity"]),
         "start": raw["start"],
@@ -359,14 +379,17 @@ def today_cairo() -> date:
         return (datetime.now(timezone.utc) + timedelta(hours=2)).date()
 
 
-def now_cairo_str() -> str:
+def now_cairo() -> datetime:
     try:
         from zoneinfo import ZoneInfo
 
-        now = datetime.now(ZoneInfo("Africa/Cairo"))
+        return datetime.now(ZoneInfo("Africa/Cairo")).replace(tzinfo=None)
     except Exception:
-        now = datetime.now(timezone.utc) + timedelta(hours=2)
-    return now.strftime("%Y-%m-%d %H:%M")
+        return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)
+
+
+def now_cairo_str() -> str:
+    return now_cairo().strftime("%Y-%m-%d %H:%M")
 
 
 def _minutes(hhmm: str) -> int:
@@ -430,6 +453,12 @@ def fmt_day(value) -> str:
     return f"{WEEKDAY_NAMES[day.weekday()]} {day.day} {MONTH_NAMES[day.month - 1]} {day.year}"
 
 
+def fmt_datetime(value: str) -> str:
+    """'2026-10-23T09:00' -> 'الجمعة 23 أكتوبر 2026 — 9:00 ص'"""
+    day, _, clock = value.partition("T")
+    return f"{fmt_day(day)} — {fmt_time(clock[:5])}" if clock else fmt_day(day)
+
+
 def fmt_time(hhmm: str) -> str:
     total = _minutes(hhmm)
     hours, minutes = total // 60, total % 60
@@ -444,7 +473,8 @@ def csrf_token() -> str:
 
 
 app.jinja_env.globals.update(
-    csrf_token=csrf_token, fmt_day=fmt_day, fmt_time=fmt_time, weekday_names=WEEKDAY_NAMES
+    csrf_token=csrf_token, fmt_day=fmt_day, fmt_time=fmt_time, fmt_datetime=fmt_datetime,
+    weekday_names=WEEKDAY_NAMES,
 )
 
 
@@ -632,6 +662,13 @@ def validate_registration(form) -> tuple[dict, dict]:
 # ============================================================
 #  الصفحات العامة
 # ============================================================
+def _seconds_until(value: str) -> int:
+    if not value:
+        return 0
+    target = datetime.strptime(value, "%Y-%m-%dT%H:%M")
+    return max(0, int((target - now_cairo()).total_seconds()))
+
+
 def render_form(form, errors, status=200):
     settings = get_settings()
     open_day = find_open_day(get_db(), settings)
@@ -641,6 +678,12 @@ def render_form(form, errors, status=200):
             form=form,
             errors=errors,
             open_day=open_day[0] if open_day else None,
+            # سبب الإغلاق: إيقاف من المسؤول أو اكتمال كل المواعيد
+            closed_reason=None if open_day else ("admin" if not settings["is_open"] else "full"),
+            closed_message=settings["closed_message"] or DEFAULT_CLOSED_MESSAGE,
+            open_at=settings["open_at"] if not settings["is_open"] else "",
+            open_in_seconds=_seconds_until(settings["open_at"]) if not settings["is_open"] else 0,
+            announcement=settings["announcement"],
             administrations=ADMINISTRATIONS,
             disabilities={
                 name: {"iq": iq_range_label(name), "req": rule[2]}
@@ -839,9 +882,19 @@ def admin_home():
         })
 
     open_day = find_open_day(conn, settings)
+    stats = conn.execute(
+        """SELECT
+               COALESCE(SUM(status = 'active' AND day >= ?), 0) AS upcoming,
+               COALESCE(SUM(status = 'active' AND day = ?), 0) AS today,
+               COALESCE(SUM(received_at LIKE ?), 0) AS received_today,
+               COALESCE(SUM(received_at IS NOT NULL), 0) AS received
+           FROM registrations""",
+        (today.isoformat(), today.isoformat(), today.isoformat() + "%"),
+    ).fetchone()
     return render_template(
         "admin.html",
         settings=settings,
+        stats=stats,
         rows=rows,
         total=sum(counts.values()),
         open_day=open_day[0] if open_day else None,
@@ -872,12 +925,42 @@ def admin_settings():
         "start": start,
         "end": end,
         "slot_minutes": str(slot_minutes),
-        "is_open": "1" if form.get("is_open") else "0",
     }
-    conn = get_db()
-    for key, value in values.items():
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+    save_settings(values)
     flash("تم حفظ الإعدادات.")
+    return redirect(url_for("admin_home"))
+
+
+@app.post("/admin/intake")
+@admin_required
+def admin_intake():
+    """فتح/إيقاف استقبال الطلبات ورسائل أولياء الأمور."""
+    form = request.form
+    action = form.get("action", "save")
+    open_at = (form.get("open_at") or "").strip()[:16]
+    if open_at:
+        try:
+            datetime.strptime(open_at, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("موعد الفتح التلقائي غير صحيح.")
+            return redirect(url_for("admin_home"))
+    values = {
+        "closed_message": (form.get("closed_message") or "").strip()[:500],
+        "announcement": (form.get("announcement") or "").strip()[:500],
+        "open_at": open_at,
+    }
+    if action == "close":
+        values["is_open"] = "0"
+        flash("تم إيقاف استقبال الطلبات. يظهر الآن لأولياء الأمور أن التسجيل مغلق.")
+    elif action == "open":
+        values.update(is_open="1", open_at="")
+        flash("تم فتح استقبال الطلبات.")
+    else:
+        flash("تم حفظ الرسائل.")
+    still_open = values["is_open"] == "1" if "is_open" in values else get_settings()["is_open"]
+    if still_open:
+        values["open_at"] = ""  # الفتح التلقائي لا معنى له والتسجيل مفتوح
+    save_settings(values)
     return redirect(url_for("admin_home"))
 
 
@@ -920,12 +1003,15 @@ def _query_registrations(day: str | None, q: str = ""):
 def admin_list():
     day = _parse_day(request.args["day"]) if request.args.get("day") else None
     q = clean_text(request.args.get("q"))
+    rows = _query_registrations(day, q)
     return render_template(
         "admin_list.html",
-        rows=_query_registrations(day, q),
+        rows=rows,
         day=day,
         q=q,
         today=today_cairo().isoformat(),
+        # مسح باركود: نتيجة واحدة مطابقة لرقم التسجيل تُعرض كبطاقة استلام سريعة
+        scanned=next((r for r in rows if r["code"] == q), None) if q else None,
     )
 
 
@@ -942,6 +1028,19 @@ def _back_to_list():
     if not target.startswith("/admin/list"):
         target = url_for("admin_list")
     return redirect(target)
+
+
+@app.post("/admin/receive/<int:reg_id>")
+@admin_required
+def admin_receive(reg_id: int):
+    """تسجيل استلام أوراق الطالب (أو إلغاؤه)."""
+    conn = get_db()
+    row = conn.execute("SELECT received_at FROM registrations WHERE id = ?", (reg_id,)).fetchone()
+    if row is not None:
+        received = None if row["received_at"] else now_cairo_str()
+        conn.execute("UPDATE registrations SET received_at = ? WHERE id = ?", (received, reg_id))
+        flash("تم تسجيل استلام الأوراق." if received else "تم إلغاء تسجيل الاستلام.")
+    return _back_to_list()
 
 
 @app.post("/admin/stop/<int:reg_id>")
@@ -979,6 +1078,7 @@ EXPORT_COLUMNS = [
     ("م", 6, lambda r, i: i),
     ("رقم التسجيل", 14, lambda r, i: r["code"]),
     ("الحالة", 10, lambda r, i: "موقوف" if r["status"] == STATUS_STOPPED else "ساري"),
+    ("استلام الأوراق", 18, lambda r, i: r["received_at"] or "لم يتم"),
     ("يوم الحضور", 26, lambda r, i: fmt_day(r["day"])),
     ("التاريخ", 13, lambda r, i: r["day"]),
     ("رقم الدور", 10, lambda r, i: r["seq"]),

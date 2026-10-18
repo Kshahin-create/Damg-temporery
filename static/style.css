@@ -227,6 +227,60 @@ td.actions form { display: inline-block; }
   .footer-bottom { justify-content: center; text-align: center; }
 }
 
+/* إعلان أعلى الفورم */
+.announce { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; padding: 14px 18px; border: 1px solid #BFDBFE; border-inline-start: 4px solid var(--navy-800); border-radius: var(--radius-lg); background: var(--navy-50); color: var(--navy-950); font-weight: 700; }
+.announce p { margin: 0; white-space: pre-line; }
+.announce-icon { font-size: 22px; line-height: 1.4; }
+
+/* صفحة الإغلاق */
+.closed-card { text-align: center; padding: 40px 24px; border-top: 4px solid var(--gold); }
+.closed-icon { display: inline-grid; place-items: center; width: 76px; height: 76px; margin-bottom: 12px; border-radius: 50%; background: var(--gold-soft); border: 2px solid #F3DC8E; font-size: 34px; }
+.closed-card h2 { justify-content: center; font-size: 24px; }
+.closed-msg { max-width: 520px; margin: 0 auto; font-size: 18px; font-weight: 700; color: var(--subtle); white-space: pre-line; }
+.closed-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+.countdown { margin-top: 22px; }
+.countdown small { display: block; margin-bottom: 10px; color: var(--navy-800); font-weight: 800; }
+.cd-units { display: flex; justify-content: center; gap: 10px; }
+.cd-units > div { min-width: 70px; padding: 10px 6px; border-radius: var(--radius); background: linear-gradient(135deg, var(--navy-950), var(--navy-800)); color: #fff; border-bottom: 3px solid var(--gold); }
+.cd-units b { display: block; font-size: 26px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.cd-units span { font-size: 12px; color: #BFDBFE; }
+
+/* لوحة الإدارة: حالة الاستقبال */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+.kpis > div { padding: 12px 16px; border: 1px solid var(--line); border-inline-start: 4px solid var(--gold); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow-sm); }
+.kpis small { display: block; font-size: 12px; color: var(--muted); }
+.kpis strong { font-size: 24px; font-weight: 800; color: var(--navy-950); }
+.intake { border-top: 4px solid var(--success); }
+.intake.is-closed { border-top-color: var(--danger); }
+.intake-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.intake-state { display: flex; align-items: center; gap: 12px; }
+.intake-state strong { display: block; font-size: 19px; font-weight: 800; color: var(--navy-950); }
+.intake-state small { color: var(--muted); }
+.dot { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 5px #DCFCE7; }
+.is-closed .dot { background: var(--danger); box-shadow: 0 0 0 5px var(--danger-soft); }
+.intake .grid { grid-template-columns: 1fr 1fr 1fr; }
+.intake-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.btn.success { background: var(--success); border-color: var(--success); color: #fff; }
+.btn.success:hover { background: #15803D; }
+.btn.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger-solid:hover { background: #B91C1C; }
+.intake-head .btn { min-height: 48px; font-size: 15px; padding: 0 22px; }
+.pill.done { background: #DCFCE7; color: #15803D; }
+
+/* بطاقة مسح الباركود */
+.scan-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-inline-start: 5px solid var(--gold); }
+.scan-card.done { border-inline-start-color: var(--success); }
+.scan-main { display: flex; align-items: center; gap: 16px; }
+.scan-main strong { display: block; font-size: 20px; font-weight: 800; color: var(--navy-950); }
+.scan-main span { display: inline-block; margin-inline-end: 6px; color: var(--subtle); }
+.scan-code { padding: 8px 14px; border: 2px dashed var(--gold); border-radius: var(--radius); background: var(--gold-soft); font-size: 22px; font-weight: 800; letter-spacing: 2px; color: var(--navy-950); }
+.btn.big-inline { min-height: 52px; padding: 0 26px; font-size: 16px; }
+
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: 1fr 1fr; }
+  .intake .grid { grid-template-columns: 1fr; }
+}
+
 /* الباركود وورقة الطباعة */
 .barcode { margin-top: 10px; }
 .barcode svg, .a4-barcode svg { display: block; margin-inline: auto; max-width: 100%; height: auto; }
