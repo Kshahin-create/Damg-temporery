@@ -228,3 +228,43 @@ body.login-page { display: grid; place-items: center; padding: 24px 16px; backgr
   .admin .scan-card .btn { width: 100%; }
   .admin .scan-main { flex-direction: column; align-items: flex-start; }
 }
+
+/* Management refinements, including tablet and compact navigation. */
+.adm-content { margin-inline: auto; }
+.adm-side { border-inline-end: 0; background: var(--navy-950); }
+.adm-nav a.active { box-shadow: none; }
+.adm-nav a { min-height: 46px; }
+.adm-search { border-radius: 10px; }
+.panel, .kpi { box-shadow: var(--shadow-sm); }
+.kpi { min-width: 0; }
+.kpi strong { margin-top: 8px; }
+.intake-fields > *, .settings-grid > * { min-width: 0; }
+.adm-content > *, .panel { min-width: 0; }
+.adm-table td { overflow-wrap: anywhere; }
+.adm-table .row-form { flex-wrap: wrap; }
+.adm-table .row-form input[type="number"] { max-width: 100%; }
+body.login-page { display: grid; min-height: 100svh; background: var(--navy-950); }
+.login-box { box-shadow: 0 20px 60px rgb(0 0 0 / 18%); }
+@media (max-width: 960px) {
+  .adm-side { position: static; flex-wrap: wrap; gap: 8px; padding: 12px; }
+  .adm-brand { flex: 1; }
+  .adm-brand span { display: block; }
+  .adm-brand strong { font-size: 13px; }
+  .adm-nav { order: 3; flex: 1 1 100%; padding-block: 6px 2px; }
+  .adm-nav a { min-height: 42px; }
+  .adm-logout { flex-shrink: 0; }
+  .adm-table td { min-width: 0; }
+  .adm-table td::before { min-width: 80px; }
+  .adm-table td > * { min-width: 0; }
+  .adm-table td.actions > * { text-align: center; }
+}
+@media (max-width: 600px) {
+  .adm-top { gap: 12px; }
+  .intake-chip { font-size: 11px; padding-inline: 10px; }
+  .adm-content { padding-inline: 12px; }
+  .panel-actions .btn { flex: 1 1 auto; white-space: normal; padding-block: 10px; }
+  .kpi { gap: 12px; }
+  .kpi small { font-size: 12px; }
+  .adm-table td { gap: 8px; padding-inline: 10px; }
+  .row-form { gap: 8px; }
+}
