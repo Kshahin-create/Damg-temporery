@@ -5,12 +5,40 @@
 {% macro cls(name) %}{% if errors.get(name) %} invalid{% endif %}{% endmacro %}
 {% macro opt() %}<em>اختياري</em>{% endmacro %}
 
-{% block content %}
-<section class="hero">
-  <h1>طلب دمج</h1>
-  <p>سجّل بيانات الطالب لتحصل على رقم التسجيل وموعد الحضور لتقديم الأوراق.</p>
-</section>
+{% block body_class %}home{% endblock %}
 
+{% block hero %}
+<section class="hero-band">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
+      <span class="eyebrow">العام الدراسي {{ year }}</span>
+      <h1>طلب دمج <span>وحجز موعد تقديم الأوراق</span></h1>
+      <p>سجّل بيانات الطالب في دقائق، واحصل فورًا على رقم التسجيل ويوم ووقت الحضور.</p>
+      <ol class="hero-steps">
+        <li><b>1</b>سجّل البيانات</li>
+        <li><b>2</b>احصل على رقم وموعد</li>
+        <li><b>3</b>احضر بالأوراق في موعدك</li>
+      </ol>
+    </div>
+    {% if open_day %}
+    <div class="hero-card">
+      <small>التسجيل الآن لحضور يوم</small>
+      <strong>{{ fmt_day(open_day) }}</strong>
+      <span>🕘 الاستقبال من {{ fmt_time(work_start) }} إلى {{ fmt_time(work_end) }}</span>
+      <a class="btn gold" href="#reg-form">ابدأ التسجيل ↓</a>
+    </div>
+    {% else %}
+    <div class="hero-card is-closed">
+      <small>حالة التسجيل</small>
+      <strong>{{ 'مغلق مؤقتًا' if closed_reason == 'admin' else 'المواعيد مكتملة' }}</strong>
+      <a class="btn light" href="{{ url_for('lookup') }}">🔍 استعلام عن موعد</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
 {% if open_day %}
   {% if announcement %}
   <div class="announce" role="note">
@@ -19,18 +47,14 @@
   </div>
   {% endif %}
 
-  <div class="next-day">
-    <span>التسجيل الآن لحضور يوم</span>
-    <strong>{{ fmt_day(open_day) }}</strong>
-  </div>
-
-  {% if errors %}<div class="alert danger">برجاء مراجعة الحقول المظللة بالأحمر.</div>{% endif %}
-
-  <form method="post" class="card" novalidate>
+  <div class="layout">
+  <form method="post" id="reg-form" class="reg-form" novalidate>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    {% if errors %}<div class="alert danger">برجاء مراجعة الحقول المظللة بالأحمر.</div>{% endif %}
 
-    <h2><span>1</span> بيانات الطالب</h2>
+    <section class="card fsec" id="sec-1" data-step="1">
+      <header class="fsec-head"><span class="fsec-num">1</span><div><h2>بيانات الطالب</h2><small>كما هي في شهادة الميلاد</small></div><i class="fsec-check" aria-hidden="true">✓</i></header>
     <div class="grid">
       <label class="full{{ cls('student_name') }}">اسم الطالب رباعيًا
         <input name="student_name" value="{{ form.get('student_name', '') }}" maxlength="120" required autocomplete="off">
@@ -51,7 +75,10 @@
       </label>
     </div>
 
-    <h2><span>2</span> بيانات المدرسة</h2>
+    </section>
+
+    <section class="card fsec" id="sec-2" data-step="2">
+      <header class="fsec-head"><span class="fsec-num">2</span><div><h2>بيانات المدرسة</h2><small>المدرسة المقيد بها الطالب حاليًا</small></div><i class="fsec-check" aria-hidden="true">✓</i></header>
     <div class="grid">
       <label class="{{ cls('administration') }}">الإدارة التعليمية
         <select name="administration" required>
@@ -77,7 +104,10 @@
       </label>
     </div>
 
-    <h2><span>3</span> بيانات الحالة</h2>
+    </section>
+
+    <section class="card fsec" id="sec-3" data-step="3">
+      <header class="fsec-head"><span class="fsec-num">3</span><div><h2>بيانات الحالة</h2><small>من التقرير الطبي ومقياس الذكاء</small></div><i class="fsec-check" aria-hidden="true">✓</i></header>
     <div class="grid">
       <label class="{{ cls('disability') }}">نوع الإعاقة
         <select name="disability" id="disability" required>
@@ -111,7 +141,10 @@
       </label>
     </div>
 
-    <h2><span>4</span> بيانات ولي الأمر</h2>
+    </section>
+
+    <section class="card fsec" id="sec-4" data-step="4">
+      <header class="fsec-head"><span class="fsec-num">4</span><div><h2>بيانات ولي الأمر</h2><small>للتواصل بخصوص الطلب</small></div><i class="fsec-check" aria-hidden="true">✓</i></header>
     <div class="grid">
       <label class="{{ cls('guardian_name') }}">اسم ولي الأمر
         <input name="guardian_name" value="{{ form.get('guardian_name', '') }}" maxlength="120" required autocomplete="off">
@@ -142,7 +175,10 @@
       </label>
     </div>
 
-    <h2><span>5</span> بيانات الأب والأم</h2>
+    </section>
+
+    <section class="card fsec" id="sec-5" data-step="5">
+      <header class="fsec-head"><span class="fsec-num">5</span><div><h2>بيانات الأب والأم</h2><small>تُملأ تلقائيًا إذا كان ولي الأمر هو الأب أو الأم</small></div><i class="fsec-check" aria-hidden="true">✓</i></header>
     <div class="grid">
       <label class="{{ cls('father_name') }}">اسم الأب رباعيًا
         <input required name="father_name" value="{{ form.get('father_name', '') }}" maxlength="120" autocomplete="off">
@@ -162,13 +198,45 @@
       </label>
     </div>
 
-    <button class="btn primary big" type="submit">تسجيل الطلب وحجز الموعد</button>
-    <p class="hint">يُحدَّد يوم ووقت الحضور تلقائيًا ويظهر لك فور التسجيل.</p>
+    </section>
+
+    <div class="card submit-card">
+      <div>
+        <strong>جاهز للتسجيل؟</strong>
+        <p>راجع البيانات جيدًا. يُحدَّد يوم ووقت الحضور تلقائيًا ويظهر لك فور التسجيل.</p>
+      </div>
+      <button class="btn primary big" type="submit">تسجيل الطلب وحجز الموعد</button>
+    </div>
   </form>
 
-  <div class="card notes">
-    <h3>ملاحظات مهمة</h3>
-    <ul>{% for item in notes %}<li>{{ item }}</li>{% endfor %}</ul>
+  <aside class="side">
+    <div class="card side-progress">
+      <h3>خطوات التسجيل</h3>
+      <ol>
+        {% for num, title in [('1','بيانات الطالب'),('2','بيانات المدرسة'),('3','بيانات الحالة'),('4','بيانات ولي الأمر'),('5','بيانات الأب والأم')] %}
+        <li data-step-link="{{ num }}"><a href="#sec-{{ num }}"><b>{{ num }}</b>{{ title }}</a></li>
+        {% endfor %}
+      </ol>
+      <div class="progress-bar"><span id="progress-fill"></span></div>
+      <small id="progress-text">0 من 5 أقسام مكتملة</small>
+    </div>
+
+    <div class="card side-docs">
+      <h3>📂 الأوراق المطلوبة عند الحضور</h3>
+      <ul>{% for item in documents %}<li>{{ item }}</li>{% endfor %}</ul>
+      <p class="note">وأوراق إضافية حسب نوع الإعاقة تظهر في إيصال الحجز.</p>
+    </div>
+
+    <div class="card notes">
+      <h3>ملاحظات مهمة</h3>
+      <ul>{% for item in notes %}<li>{{ item }}</li>{% endfor %}</ul>
+    </div>
+
+    <a class="card side-lookup" href="{{ url_for('lookup') }}">
+      <span>🔍</span>
+      <div><strong>سجّلت قبل كده؟</strong><small>اعرف موعدك واطبع الإيصال</small></div>
+    </a>
+  </aside>
   </div>
 {% else %}
   <div class="card closed-card">
@@ -243,10 +311,48 @@
     el.addEventListener('input', syncParent); el.addEventListener('change', syncParent);
   });
 
-  var form = document.querySelector('form.card');
-  if (form) form.addEventListener('submit', function () {
-    var button = form.querySelector('button[type=submit]');
-    button.disabled = true; button.textContent = 'جارٍ التسجيل…';
-  });
+  var form = document.getElementById('reg-form');
+  if (form) {
+    form.addEventListener('submit', function () {
+      var button = form.querySelector('button[type=submit]');
+      button.disabled = true; button.textContent = 'جارٍ التسجيل…';
+    });
+
+    // تقدّم التسجيل: القسم مكتمل عندما تمتلئ كل حقوله المطلوبة
+    var sections = form.querySelectorAll('.fsec');
+    var updateProgress = function () {
+      var done = 0;
+      sections.forEach(function (sec) {
+        var required = sec.querySelectorAll('[required]');
+        var complete = Array.prototype.every.call(required, function (el) { return el.value.trim() !== ''; });
+        sec.classList.toggle('is-complete', complete);
+        var link = document.querySelector('[data-step-link="' + sec.dataset.step + '"]');
+        if (link) link.classList.toggle('done', complete);
+        if (complete) done++;
+      });
+      document.getElementById('progress-fill').style.width = (done / sections.length * 100) + '%';
+      document.getElementById('progress-text').textContent = done + ' من ' + sections.length + ' أقسام مكتملة';
+    };
+    form.addEventListener('input', updateProgress);
+    form.addEventListener('change', updateProgress);
+    updateProgress();
+
+    // تمييز القسم الحالي في القائمة الجانبية
+    if ('IntersectionObserver' in window) {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          document.querySelectorAll('[data-step-link]').forEach(function (li) {
+            li.classList.toggle('current', li.dataset.stepLink === entry.target.dataset.step);
+          });
+        });
+      }, { rootMargin: '-40% 0px -55% 0px' });
+      sections.forEach(function (sec) { observer.observe(sec); });
+    }
+
+    // عند وجود أخطاء: انتقل لأول حقل خاطئ
+    var firstInvalid = form.querySelector('label.invalid input, label.invalid select, label.invalid textarea');
+    if (firstInvalid) { firstInvalid.scrollIntoView({ block: 'center' }); firstInvalid.focus({ preventScroll: true }); }
+  }
 </script>
 {% endblock %}

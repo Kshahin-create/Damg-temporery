@@ -776,6 +776,10 @@ def render_form(form, errors, status=200):
                 for name, rule in DISABILITY_RULES.items()
             },
             notes=IMPORTANT_NOTES,
+            documents=GENERAL_DOCUMENTS,
+            year=ACADEMIC_YEAR_LABEL,
+            work_start=settings["start"],
+            work_end=settings["end"],
             stages=STAGES,
             relations=RELATIONS,
         ),

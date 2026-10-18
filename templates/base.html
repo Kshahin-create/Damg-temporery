@@ -32,6 +32,8 @@
     </div>
   </header>
 
+  {% block hero %}{% endblock %}
+
   <main class="wrap">
     {% with messages = get_flashed_messages() %}
       {% for message in messages %}<div class="alert info">{{ message }}</div>{% endfor %}
