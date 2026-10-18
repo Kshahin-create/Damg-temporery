@@ -1,79 +1,156 @@
-{% extends "base.html" %}
-{% block title %}لوحة الإدارة{% endblock %}
-{% block body_class %}wide{% endblock %}
-{% block nav %}
-  <a class="btn light" href="{{ url_for('admin_home') }}">⚙️ الأيام والإعدادات</a>
-  <a class="btn gold" href="{{ url_for('admin_list') }}">📋 كل الطلبات</a>
-  <form method="post" action="{{ url_for('admin_logout') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="btn outline" type="submit">تسجيل الخروج</button>
-  </form>
-{% endblock %}
+{% extends "admin_base.html" %}
+{% block title %}الرئيسية{% endblock %}
+{% block heading %}لوحة التحكم{% endblock %}
 
 {% block content %}
-<div class="kpis">
-  <div><small>طلبات سارية قادمة</small><strong>{{ stats['upcoming'] }}</strong></div>
-  <div><small>مواعيد اليوم</small><strong>{{ stats['today'] }}</strong></div>
-  <div><small>استلام أوراق اليوم</small><strong>{{ stats['received_today'] }}</strong></div>
-  <div><small>إجمالي الأوراق المستلمة</small><strong>{{ stats['received'] }}</strong></div>
-</div>
+<section class="kpi-grid">
+  <div class="kpi">
+    <i class="kpi-icon blue">📋</i>
+    <div><small>طلبات سارية قادمة</small><strong>{{ stats['upcoming'] }}</strong></div>
+  </div>
+  <div class="kpi">
+    <i class="kpi-icon gold">📅</i>
+    <div><small>مواعيد اليوم</small><strong>{{ stats['today'] }}</strong></div>
+  </div>
+  <div class="kpi">
+    <i class="kpi-icon green">📥</i>
+    <div><small>أوراق استُلمت اليوم</small><strong>{{ stats['received_today'] }}</strong></div>
+  </div>
+  <div class="kpi">
+    <i class="kpi-icon slate">🗂️</i>
+    <div><small>إجمالي الأوراق المستلمة</small><strong>{{ stats['received'] }}</strong></div>
+  </div>
+</section>
 
-<div class="stats">
-  <form method="get" action="{{ url_for('admin_list') }}" class="search">
-    <input name="q" autofocus placeholder="امسح باركود الإيصال أو اكتب رقم التسجيل">
-    <button class="btn" type="submit">بحث</button>
-  </form>
-  <a class="btn primary" href="{{ url_for('admin_export') }}">تصدير Excel لكل الأيام</a>
-</div>
-
-<form method="post" action="{{ url_for('admin_intake') }}" class="card intake {{ 'is-open' if open_day else 'is-closed' }}">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="intake-head">
-    <div class="intake-state">
-      <span class="dot"></span>
-      <div>
-        {% if open_day %}
-          <strong>استقبال الطلبات مفتوح</strong>
-          <small>التسجيل الآن على يوم {{ fmt_day(open_day) }}</small>
-        {% elif not settings.is_open %}
-          <strong>استقبال الطلبات متوقف</strong>
-          <small>{% if settings.open_at %}يفتح تلقائيًا {{ fmt_datetime(settings.open_at) }}{% else %}يظهر لأولياء الأمور أن التسجيل مغلق{% endif %}</small>
-        {% else %}
-          <strong>لا توجد مواعيد متاحة</strong>
-          <small>كل الأيام القادمة مكتملة أو موقوفة — زوّد العدد أو أضف أيامًا</small>
-        {% endif %}
+<div class="dash-grid">
+  {# ---------- حالة الاستقبال ---------- #}
+  <form method="post" action="{{ url_for('admin_intake') }}" class="panel intake {{ 'is-open' if open_day else 'is-closed' }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="intake-head">
+      <div class="intake-state">
+        <span class="dot"></span>
+        <div>
+          {% if open_day %}
+            <strong>استقبال الطلبات مفتوح</strong>
+            <small>التسجيل الآن على يوم {{ fmt_day(open_day) }}</small>
+          {% elif not settings.is_open %}
+            <strong>استقبال الطلبات متوقف</strong>
+            <small>{% if settings.open_at %}يفتح تلقائيًا {{ fmt_datetime(settings.open_at) }}{% else %}يظهر لأولياء الأمور أن التسجيل مغلق{% endif %}</small>
+          {% else %}
+            <strong>لا توجد مواعيد متاحة</strong>
+            <small>كل الأيام القادمة مكتملة أو موقوفة — زوّد العدد أو أضف أيامًا</small>
+          {% endif %}
+        </div>
       </div>
+      {% if settings.is_open %}
+        <button class="btn danger-solid" name="action" value="close" type="submit" onclick="return confirm('إيقاف استقبال الطلبات الآن؟');">⏸ إيقاف الاستقبال</button>
+      {% else %}
+        <button class="btn success" name="action" value="open" type="submit">▶ فتح الاستقبال الآن</button>
+      {% endif %}
     </div>
-    {% if settings.is_open %}
-      <button class="btn danger-solid" name="action" value="close" type="submit" onclick="return confirm('إيقاف استقبال الطلبات الآن؟');">⏸ إيقاف استقبال الطلبات</button>
-    {% else %}
-      <button class="btn success" name="action" value="open" type="submit">▶ فتح استقبال الطلبات الآن</button>
+
+    {% if open_day and open_capacity %}
+    <div class="fill">
+      <div class="fill-top"><span>امتلاء يوم {{ fmt_day(open_day) }}</span><b>{{ open_count }} / {{ open_capacity }}</b></div>
+      <div class="fill-bar"><span style="width: {{ [100, (open_count * 100 / open_capacity)|round|int]|min }}%"></span></div>
+    </div>
     {% endif %}
-  </div>
 
-  <div class="grid">
-    <label>رسالة الإغلاق لأولياء الأمور
-      <textarea name="closed_message" rows="3" maxlength="500" placeholder="التسجيل مغلق مؤقتًا، يرجى المحاولة في وقت آخر.">{{ settings.closed_message }}</textarea>
-      <span class="note">مثال: سيُفتح التسجيل يوم الجمعة الساعة 9 صباحًا. اتركها فارغة لعرض الرسالة الافتراضية.</span>
-    </label>
-    <label>إعلان أعلى الفورم <em>اختياري</em>
-      <textarea name="announcement" rows="3" maxlength="500" placeholder="مثال: يرجى إحضار أصول الأوراق مع الصور.">{{ settings.announcement }}</textarea>
-      <span class="note">يظهر لأولياء الأمور أثناء فتح التسجيل.</span>
-    </label>
-    <label>فتح تلقائي في موعد <em>اختياري</em>
-      <input type="datetime-local" name="open_at" value="{{ settings.open_at }}">
-      <span class="note">عند الإيقاف: يفتح التسجيل وحده في هذا الموعد، ويظهر لأولياء الأمور عدّاد تنازلي.</span>
-    </label>
-  </div>
-  <div class="intake-actions">
-    <button class="btn primary" name="action" value="save" type="submit">حفظ الرسائل</button>
-    <a class="btn" href="{{ url_for('index') }}" target="_blank" rel="noopener">👁 معاينة صفحة أولياء الأمور</a>
-  </div>
-</form>
+    <div class="intake-fields">
+      <label>رسالة الإغلاق لأولياء الأمور
+        <textarea name="closed_message" rows="3" maxlength="500" placeholder="التسجيل مغلق مؤقتًا، يرجى المحاولة في وقت آخر.">{{ settings.closed_message }}</textarea>
+        <span class="note">مثال: سيُفتح التسجيل يوم الجمعة الساعة 9 صباحًا. فارغة = الرسالة الافتراضية.</span>
+      </label>
+      <label>إعلان أعلى الفورم <em>اختياري</em>
+        <textarea name="announcement" rows="3" maxlength="500" placeholder="مثال: يرجى إحضار أصول الأوراق مع الصور.">{{ settings.announcement }}</textarea>
+        <span class="note">يظهر لأولياء الأمور أثناء فتح التسجيل.</span>
+      </label>
+      <label>فتح تلقائي في موعد <em>اختياري</em>
+        <input type="datetime-local" name="open_at" value="{{ settings.open_at }}">
+        <span class="note">عند الإيقاف يفتح التسجيل وحده في الموعد مع عدّاد تنازلي.</span>
+      </label>
+    </div>
+    <div class="panel-actions">
+      <button class="btn primary" name="action" value="save" type="submit">حفظ الرسائل</button>
+      <a class="btn" href="{{ url_for('index') }}" target="_blank" rel="noopener">👁 معاينة صفحة أولياء الأمور</a>
+    </div>
+  </form>
 
-<form method="post" action="{{ url_for('admin_settings') }}" class="card">
+  {# ---------- اختصارات ---------- #}
+  <div class="panel quick">
+    <h2>اختصارات سريعة</h2>
+    <a class="quick-item" href="{{ url_for('admin_list', status='pending', day=today_iso) }}">
+      <i class="kpi-icon green">📥</i>
+      <span><strong>استلام أوراق اليوم</strong><small>امسح الباركود وأكّد الاستلام</small></span>
+    </a>
+    <a class="quick-item" href="{{ url_for('admin_list', day=today_iso) }}">
+      <i class="kpi-icon gold">📅</i>
+      <span><strong>كشف مواعيد اليوم</strong><small>{{ stats['today'] }} طلب سارٍ</small></span>
+    </a>
+    <a class="quick-item" href="{{ url_for('admin_export', day=today_iso) }}">
+      <i class="kpi-icon blue">⬇️</i>
+      <span><strong>Excel مواعيد اليوم</strong><small>تنزيل كشف اليوم</small></span>
+    </a>
+    <a class="quick-item" href="{{ url_for('admin_export') }}">
+      <i class="kpi-icon slate">🗄️</i>
+      <span><strong>Excel لكل الأيام</strong><small>نسخة كاملة بكل الطلبات ({{ total }})</small></span>
+    </a>
+  </div>
+</div>
+
+{# ---------- الأيام ---------- #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>أيام الاستقبال</h2>
+    <small>اترك «عدد خاص» فارغًا لاستخدام العدد العام. عند اكتمال اليوم ينتقل التسجيل لليوم التالي.</small>
+  </div>
+  <div class="adm-table">
+    <table>
+      <thead>
+        <tr><th>اليوم</th><th>الامتلاء</th><th>عدد خاص / إيقاف</th><th>إجراءات</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set pct = [100, ((row.count * 100 / row.capacity) if row.capacity else 0)|round|int]|min %}
+        <tr class="{{ 'past' if row.past }} {{ 'is-now' if open_day and row.day == open_day.isoformat() }}">
+          <td data-label="اليوم">
+            <strong>{{ fmt_day(row.day) }}</strong>
+            {% if open_day and row.day == open_day.isoformat() %}<span class="pill">التسجيل عليه الآن</span>
+            {% elif row.closed %}<span class="pill full">موقوف</span>
+            {% elif row.past %}<span class="pill old">انتهى</span>{% endif %}
+          </td>
+          <td data-label="الامتلاء">
+            <div class="mini-fill {{ 'full' if row.capacity and row.count >= row.capacity }}">
+              <span class="mini-bar"><span style="width: {{ pct }}%"></span></span>
+              <b>{{ row.count }} / {{ row.capacity }}</b>
+            </div>
+          </td>
+          <td data-label="عدد خاص / إيقاف">
+            <form method="post" action="{{ url_for('admin_day_update', day=row.day) }}" class="row-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="number" name="capacity" min="0" max="5000" value="{{ row.custom if row.custom is not none else '' }}" placeholder="{{ settings.capacity }}" aria-label="عدد خاص">
+              <label class="switch"><input type="checkbox" name="closed" {% if row.closed %}checked{% endif %}> إيقاف</label>
+              <button class="btn small" type="submit">حفظ</button>
+            </form>
+          </td>
+          <td data-label="إجراءات" class="actions">
+            <a class="btn small" href="{{ url_for('admin_list', day=row.day) }}">عرض</a>
+            <a class="btn small" href="{{ url_for('admin_export', day=row.day) }}">Excel</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ---------- الإعدادات ---------- #}
+<form method="post" action="{{ url_for('admin_settings') }}" class="panel" id="settings">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <h2 class="plain">إعدادات الاستقبال</h2>
+  <div class="panel-head">
+    <h2>إعدادات الاستقبال</h2>
+    <small>يوزَّع عدد اليوم بالتساوي على فترات العمل. التغيير لا يمس مواعيد من سجّلوا بالفعل.</small>
+  </div>
 
   <div class="field-title">أيام استقبال الأوراق</div>
   <div class="days-pick">
@@ -82,7 +159,7 @@
     {% endfor %}
   </div>
 
-  <div class="grid four">
+  <div class="settings-grid">
     <label>العدد لكل يوم
       <input type="number" name="capacity" min="1" max="5000" value="{{ settings.capacity }}" required>
     </label>
@@ -96,42 +173,8 @@
       <input type="number" name="slot_minutes" min="5" max="120" value="{{ settings.slot_minutes }}" required>
     </label>
   </div>
-
-  <button class="btn primary" type="submit">حفظ الإعدادات</button>
-  <p class="hint">يوزَّع عدد اليوم بالتساوي على فترات العمل. تغيير الإعدادات لا يغيّر مواعيد من سجّلوا بالفعل.</p>
-</form>
-
-<div class="card">
-  <h2 class="plain">الأيام</h2>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>اليوم</th><th>المسجلون</th><th>عدد خاص لهذا اليوم</th><th>إيقاف اليوم</th><th></th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr class="{{ 'past' if row.past }}">
-          <td><strong>{{ fmt_day(row.day) }}</strong></td>
-          <td>
-            <span class="pill {{ 'full' if row.capacity and row.count >= row.capacity }}">{{ row.count }} / {{ row.capacity }}</span>
-          </td>
-          <td colspan="3">
-            <form method="post" action="{{ url_for('admin_day_update', day=row.day) }}" class="row-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="number" name="capacity" min="0" max="5000" value="{{ row.custom if row.custom is not none else '' }}" placeholder="{{ settings.capacity }}">
-              <label class="switch"><input type="checkbox" name="closed" {% if row.closed %}checked{% endif %}> مغلق</label>
-              <button class="btn small" type="submit">حفظ</button>
-            </form>
-          </td>
-          <td class="actions">
-            <a class="btn small" href="{{ url_for('admin_list', day=row.day) }}">عرض</a>
-            <a class="btn small" href="{{ url_for('admin_export', day=row.day) }}">Excel</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="panel-actions">
+    <button class="btn primary" type="submit">حفظ الإعدادات</button>
   </div>
-  <p class="hint">اترك «عدد خاص» فارغًا لاستخدام العدد العام. عند اكتمال اليوم ينتقل التسجيل تلقائيًا لليوم التالي.</p>
-</div>
+</form>
 {% endblock %}

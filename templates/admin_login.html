@@ -1,16 +1,32 @@
-{% extends "base.html" %}
-{% block title %}دخول الإدارة{% endblock %}
-{% block nav %}{% endblock %}
-{% block content %}
-<section class="hero"><h1>دخول الإدارة</h1></section>
-{% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
-<form method="post" class="card narrow">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="grid">
-    <label class="full">كلمة المرور
-      <input type="password" name="password" required autofocus autocomplete="current-password">
-    </label>
-  </div>
-  <button class="btn primary big" type="submit">دخول</button>
-</form>
-{% endblock %}
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B2463">
+  <meta name="robots" content="noindex, nofollow">
+  <title>دخول الإدارة — إدارة طلبات الدمج</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body class="admin login-page">
+  <main class="login-box">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="شعار منظومة طلاب الدمج" width="96" height="96">
+    <h1>لوحة إدارة طلبات الدمج</h1>
+    <p>إدارة الدمج التعليمي الشامل — مديرية التربية والتعليم بالقليوبية</p>
+    {% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>كلمة المرور
+        <input type="password" name="password" required autofocus autocomplete="current-password">
+      </label>
+      <button class="btn primary big" type="submit">دخول</button>
+    </form>
+    <a class="back" href="{{ url_for('index') }}">← العودة لصفحة أولياء الأمور</a>
+  </main>
+</body>
+</html>

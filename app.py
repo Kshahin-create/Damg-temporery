@@ -564,6 +564,14 @@ app.jinja_env.globals.update(
 )
 
 
+@app.context_processor
+def admin_context():
+    """بيانات شريط لوحة الإدارة (لا تُحسب لصفحات أولياء الأمور)."""
+    if not request.path.startswith("/admin") or not session.get("admin"):
+        return {}
+    return {"today_iso": today_cairo().isoformat(), "intake_open": get_settings()["is_open"]}
+
+
 @app.before_request
 def check_csrf():
     if request.method == "POST":
@@ -972,6 +980,8 @@ def admin_home():
         })
 
     open_day = find_open_day(conn, settings)
+    open_capacity = open_day[1] if open_day else 0
+    open_count = counts.get(open_day[0].isoformat(), 0) if open_day else 0
     stats = conn.execute(
         """SELECT
                COALESCE(SUM(CASE WHEN status = 'active' AND day >= ? THEN 1 ELSE 0 END), 0) AS upcoming,
@@ -985,6 +995,8 @@ def admin_home():
         "admin.html",
         settings=settings,
         stats=stats,
+        open_capacity=open_capacity,
+        open_count=open_count,
         rows=rows,
         total=sum(counts.values()),
         open_day=open_day[0] if open_day else None,
@@ -1077,11 +1089,20 @@ def admin_day_update(day: str):
     return redirect(url_for("admin_home"))
 
 
-def _query_registrations(day: str | None, q: str = ""):
+LIST_STATUS_FILTERS = {
+    "active": " AND status = 'active'",
+    "pending": " AND status = 'active' AND received_at IS NULL",
+    "received": " AND received_at IS NOT NULL",
+    "stopped": " AND status = 'stopped'",
+}
+
+
+def _query_registrations(day: str | None, q: str = "", status: str = ""):
     sql, params = "SELECT * FROM registrations WHERE 1=1", []
     if day:
         sql += " AND day = ?"
         params.append(day)
+    sql += LIST_STATUS_FILTERS.get(status, "")
     if q:
         like = f"%{q}%"
         sql += " AND (student_name LIKE ? OR student_nid LIKE ? OR phone LIKE ? OR code LIKE ?)"
@@ -1094,12 +1115,19 @@ def _query_registrations(day: str | None, q: str = ""):
 def admin_list():
     day = _parse_day(request.args["day"]) if request.args.get("day") else None
     q = clean_text(request.args.get("q"))
-    rows = _query_registrations(day, q)
+    status = request.args.get("status", "")
+    status = status if status in LIST_STATUS_FILTERS else ""
+    rows = _query_registrations(day, q, status)
+    days = [r[0] for r in get_db().execute("SELECT DISTINCT day FROM registrations ORDER BY day DESC")]
+    if day and day not in days:
+        days.insert(0, day)
     return render_template(
         "admin_list.html",
         rows=rows,
         day=day,
         q=q,
+        status=status,
+        days=days,
         today=today_cairo().isoformat(),
         # مسح باركود: نتيجة واحدة مطابقة لرقم التسجيل تُعرض كبطاقة استلام سريعة
         scanned=next((r for r in rows if r["code"] == q), None) if q else None,

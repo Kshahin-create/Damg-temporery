@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B2463">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}لوحة الإدارة{% endblock %} — إدارة طلبات الدمج</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body class="admin">
+  {% set ep = request.endpoint %}
+  <div class="adm-shell">
+    <aside class="adm-side">
+      <a class="adm-brand" href="{{ url_for('admin_home') }}">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="" width="44" height="44">
+        <span><strong>إدارة طلبات الدمج</strong><small>لوحة التحكم</small></span>
+      </a>
+
+      <nav class="adm-nav">
+        <a href="{{ url_for('admin_home') }}" class="{{ 'active' if ep == 'admin_home' }}"><i>📊</i><span>الرئيسية</span></a>
+        <a href="{{ url_for('admin_list') }}" class="{{ 'active' if ep == 'admin_list' and not request.args.get('day') and not request.args.get('status') }}"><i>📋</i><span>كل الطلبات</span></a>
+        <a href="{{ url_for('admin_list', day=today_iso) }}" class="{{ 'active' if ep == 'admin_list' and request.args.get('day') == today_iso }}"><i>📅</i><span>مواعيد اليوم</span></a>
+        <a href="{{ url_for('admin_list', status='pending', day=today_iso) }}" class="{{ 'active' if ep == 'admin_list' and request.args.get('status') == 'pending' }}"><i>📥</i><span>استلام الأوراق</span></a>
+        <a href="{{ url_for('admin_home') }}#settings"><i>⚙️</i><span>الإعدادات</span></a>
+        <a href="{{ url_for('admin_export') }}"><i>⬇️</i><span>تصدير Excel</span></a>
+        <a href="{{ url_for('index') }}" target="_blank" rel="noopener"><i>👁</i><span>صفحة أولياء الأمور</span></a>
+      </nav>
+
+      <form method="post" action="{{ url_for('admin_logout') }}" class="adm-logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit"><i>⎋</i><span>تسجيل الخروج</span></button>
+      </form>
+    </aside>
+
+    <div class="adm-main">
+      <header class="adm-top">
+        <div>
+          <h1>{% block heading %}لوحة التحكم{% endblock %}</h1>
+          <small>{{ fmt_day(today_iso) }}</small>
+        </div>
+        <form method="get" action="{{ url_for('admin_list') }}" class="adm-search" role="search">
+          <span aria-hidden="true">🔎</span>
+          <input name="q" value="{{ q if q is defined else '' }}" {% block search_autofocus %}autofocus{% endblock %} placeholder="امسح باركود الإيصال أو ابحث بالاسم / الرقم القومي / الهاتف / رقم التسجيل" aria-label="بحث">
+        </form>
+        <span class="intake-chip {{ 'on' if intake_open else 'off' }}">
+          <i></i>{{ 'الاستقبال مفتوح' if intake_open else 'الاستقبال متوقف' }}
+        </span>
+      </header>
+
+      <div class="adm-content">
+        {% with messages = get_flashed_messages() %}
+          {% for message in messages %}<div class="toast" role="status">{{ message }}</div>{% endfor %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

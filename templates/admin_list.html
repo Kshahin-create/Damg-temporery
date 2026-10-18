@@ -1,100 +1,126 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block title %}الطلبات{% endblock %}
-{% block body_class %}wide{% endblock %}
-{% block nav %}
-  <a class="btn light" href="{{ url_for('admin_home') }}">⚙️ الأيام والإعدادات</a>
-  <a class="btn gold" href="{{ url_for('admin_list') }}">📋 كل الطلبات</a>
-  <form method="post" action="{{ url_for('admin_logout') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="btn outline" type="submit">تسجيل الخروج</button>
-  </form>
-{% endblock %}
+{% block heading %}{% if status == 'pending' %}استلام الأوراق{% elif day == today_iso %}مواعيد اليوم{% else %}الطلبات{% endif %}{% endblock %}
+{% block search_autofocus %}{% if not scanned %}autofocus{% endif %}{% endblock %}
 
 {% block content %}
-<div class="stats">
-  <div><small>{{ fmt_day(day) if day else 'كل الأيام' }}</small><strong>{{ rows|length }} طلب</strong></div>
-  <form method="get" class="search">
-    {% if day %}<input type="hidden" name="day" value="{{ day }}">{% endif %}
-    <input name="q" value="{{ q }}" autofocus placeholder="امسح الباركود أو ابحث بالاسم / الرقم القومي / الهاتف / رقم التسجيل">
-    <button class="btn" type="submit">بحث</button>
-  </form>
-  <a class="btn primary" href="{{ url_for('admin_export', day=day) if day else url_for('admin_export') }}">تصدير Excel</a>
-</div>
-
+{# ---------- بطاقة مسح الباركود ---------- #}
 {% if scanned %}
-<div class="card scan-card {{ 'done' if scanned['received_at'] }}">
+<div class="panel scan-card {{ 'done' if scanned['received_at'] }}">
   <div class="scan-main">
     <span class="scan-code" dir="ltr">{{ scanned['code'] }}</span>
     <div>
       <strong>{{ scanned['student_name'] }}</strong>
-      <span>{{ fmt_day(scanned['day']) }} — {{ fmt_time(scanned['slot_start']) }} · {{ scanned['administration'] }} · {{ scanned['disability'] }}</span>
-      {% if scanned['status'] == 'stopped' %}<span class="pill full">هذا الطلب موقوف</span>
-      {% elif scanned['received_at'] %}<span class="pill done">تم استلام الأوراق {{ scanned['received_at'] }}</span>
-      {% elif scanned['day'] != today %}<span class="pill old">موعده ليس اليوم</span>{% endif %}
+      <span>{{ fmt_day(scanned['day']) }} — {{ fmt_time(scanned['slot_start']) }}</span>
+      <span>{{ scanned['administration'] }} · {{ scanned['grade'] }} · {{ scanned['disability'] }}</span>
+      <div class="scan-flags">
+        {% if scanned['status'] == 'stopped' %}<span class="pill full">هذا الطلب موقوف</span>
+        {% elif scanned['received_at'] %}<span class="pill done">تم استلام الأوراق {{ scanned['received_at'] }}</span>
+        {% elif scanned['day'] != today %}<span class="pill old">موعده ليس اليوم</span>{% endif %}
+      </div>
     </div>
   </div>
   {% if scanned['status'] != 'stopped' and not scanned['received_at'] %}
   <form method="post" action="{{ url_for('admin_receive', reg_id=scanned['id']) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="next" value="{{ url_for('admin_list') }}">
-    <button class="btn success big-inline" type="submit">✔ تأكيد استلام الأوراق</button>
+    <input type="hidden" name="next" value="{{ url_for('admin_list', status=status, day=day) if status else url_for('admin_list') }}">
+    <button class="btn success big-inline" type="submit" autofocus>✔ تأكيد استلام الأوراق</button>
   </form>
   {% endif %}
 </div>
 {% endif %}
 
-<div class="card">
-  <div class="table-wrap">
-    <table>
+{# ---------- الفلاتر ---------- #}
+<form method="get" class="panel filters">
+  <label>اليوم
+    <select name="day" onchange="this.form.submit()">
+      <option value="">كل الأيام</option>
+      {% for d in days %}<option value="{{ d }}" {% if d == day %}selected{% endif %}>{{ fmt_day(d) }}{% if d == today %} (اليوم){% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <label>الحالة
+    <select name="status" onchange="this.form.submit()">
+      {% for value, label in [('', 'الكل'), ('active', 'سارية'), ('pending', 'لم تُستلم أوراقها'), ('received', 'استُلمت أوراقها'), ('stopped', 'موقوفة')] %}
+      <option value="{{ value }}" {% if value == (status or '') %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="grow">بحث
+    <input name="q" value="{{ q }}" placeholder="الاسم / الرقم القومي / الهاتف / رقم التسجيل">
+  </label>
+  <div class="filter-actions">
+    <button class="btn primary" type="submit">تطبيق</button>
+    {% if day or q or status %}<a class="btn" href="{{ url_for('admin_list') }}">مسح الفلاتر</a>{% endif %}
+  </div>
+</form>
+
+{# ---------- النتائج ---------- #}
+<section class="panel">
+  <div class="panel-head row">
+    <div>
+      <h2>{{ rows|length }} طلب</h2>
+      <small>{{ fmt_day(day) if day else 'كل الأيام' }}{% if q %} · بحث: «{{ q }}»{% endif %}</small>
+    </div>
+    <a class="btn primary" href="{{ url_for('admin_export', day=day) if day else url_for('admin_export') }}">⬇️ تصدير Excel</a>
+  </div>
+
+  <div class="adm-table">
+    <table class="reg-table">
       <thead>
         <tr>
-          <th>رقم التسجيل</th><th>الحالة</th>{% if not day %}<th>اليوم</th>{% endif %}<th>الموعد</th><th>الطالب</th><th>الرقم القومي</th>
-          <th>الإدارة</th><th>المدرسة</th><th>الصف</th><th>الإعاقة</th><th>الذكاء</th><th>ولي الأمر</th><th>الهاتف</th><th></th>
+          <th>رقم التسجيل</th><th>الحالة</th>{% if not day %}<th>اليوم</th>{% endif %}<th>الموعد</th><th>الطالب</th>
+          <th>الإدارة / المدرسة</th><th>الحالة الصحية</th><th>ولي الأمر</th><th>إجراءات</th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
         <tr class="{{ 'past' if r['status'] == 'stopped' }}">
-          <td dir="ltr"><strong>{{ r['code'] }}</strong></td>
-          <td>
+          <td data-label="رقم التسجيل" dir="ltr"><strong class="code">{{ r['code'] }}</strong></td>
+          <td data-label="الحالة">
             {% if r['status'] == 'stopped' %}<span class="pill full">موقوف</span>
             {% elif r['day'] < today %}<span class="pill old">قديم</span>
             {% else %}<span class="pill">ساري</span>{% endif %}
             {% if r['received_at'] %}<span class="pill done" title="{{ r['received_at'] }}">استُلمت الأوراق</span>{% endif %}
           </td>
-          {% if not day %}<td>{{ fmt_day(r['day']) }}</td>{% endif %}
-          <td class="nowrap">{{ fmt_time(r['slot_start']) }}</td>
-          <td>{{ r['student_name'] }}</td>
-          <td dir="ltr">{{ r['student_nid'] }}</td>
-          <td>{{ r['administration'] }}</td>
-          <td>{{ r['school'] }}</td>
-          <td>{{ r['grade'] }}</td>
-          <td>{{ r['disability'] }}</td>
-          <td>{{ r['iq_score'] if r['iq_score'] is not none else '—' }}</td>
-          <td>{{ r['guardian_name'] }} <small>({{ r['relation'] }})</small></td>
-          <td dir="ltr">{{ r['phone'] }}</td>
-          <td class="actions">
+          {% if not day %}<td data-label="اليوم">{{ fmt_day(r['day']) }}</td>{% endif %}
+          <td data-label="الموعد" class="nowrap">{{ fmt_time(r['slot_start']) }}</td>
+          <td data-label="الطالب">
+            <strong>{{ r['student_name'] }}</strong>
+            <small class="sub" dir="ltr">{{ r['student_nid'] }}</small>
+          </td>
+          <td data-label="الإدارة / المدرسة">
+            {{ r['administration'] }}
+            <small class="sub">{{ r['school'] }} · {{ r['grade'] }}</small>
+          </td>
+          <td data-label="الحالة الصحية">
+            {{ r['disability'] }}
+            <small class="sub">ذكاء: {{ r['iq_score'] if r['iq_score'] is not none else '—' }}</small>
+          </td>
+          <td data-label="ولي الأمر">
+            {{ r['guardian_name'] }} <small>({{ r['relation'] }})</small>
+            <small class="sub" dir="ltr"><a href="tel:{{ r['phone'] }}">{{ r['phone'] }}</a></small>
+          </td>
+          <td data-label="إجراءات" class="actions">
             {% if r['status'] != 'stopped' %}
             <form method="post" action="{{ url_for('admin_receive', reg_id=r['id']) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="next" value="{{ request.full_path }}">
               <button class="btn small {{ '' if r['received_at'] else 'success' }}" type="submit">{{ 'إلغاء الاستلام' if r['received_at'] else 'استلام' }}</button>
             </form>
-            {% endif %}
-            {% if r['status'] == 'stopped' %}
-            <form method="post" action="{{ url_for('admin_resume', reg_id=r['id']) }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="next" value="{{ request.full_path }}">
-              <button class="btn small" type="submit">إعادة تفعيل</button>
-            </form>
-            {% else %}
             <form method="post" action="{{ url_for('admin_stop', reg_id=r['id']) }}" onsubmit="return confirm('إيقاف طلب {{ r['student_name'] }}؟');">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="next" value="{{ request.full_path }}">
               <button class="btn small" type="submit">إيقاف</button>
             </form>
+            {% else %}
+            <form method="post" action="{{ url_for('admin_resume', reg_id=r['id']) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn small" type="submit">إعادة تفعيل</button>
+            </form>
             {% endif %}
-            <form method="post" action="{{ url_for('admin_delete', reg_id=r['id']) }}" onsubmit="return confirm('حذف تسجيل {{ r['student_name'] }}؟');">
+            <a class="btn small" href="{{ url_for('ticket', token=r['token']) }}" target="_blank" rel="noopener">الإيصال</a>
+            <form method="post" action="{{ url_for('admin_delete', reg_id=r['id']) }}" onsubmit="return confirm('حذف تسجيل {{ r['student_name'] }} نهائيًا؟');">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="next" value="{{ request.full_path }}">
               <button class="btn small danger" type="submit">حذف</button>
@@ -102,10 +128,10 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="14" class="empty">لا توجد طلبات.</td></tr>
+        <tr class="empty-row"><td colspan="9" class="empty">لا توجد طلبات مطابقة.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
+</section>
 {% endblock %}
