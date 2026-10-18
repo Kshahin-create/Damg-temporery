@@ -289,14 +289,76 @@ STATUS_ACTIVE, STATUS_STOPPED = "active", "stopped"
 # ============================================================
 #  قاعدة البيانات
 # ============================================================
-def connect() -> sqlite3.Connection:
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+# على Railway: قاعدة Postgres دائمة لا تُمسح مع إعادة النشر. بدونها: ملف SQLite محلي.
+USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+PG_SCHEMA = os.environ.get("PG_SCHEMA", "booking")
+PG_LOCK_KEY = 470_2026  # قفل تسلسل الحجز (بديل BEGIN IMMEDIATE في SQLite)
+
+INTEGRITY_ERRORS: tuple = (sqlite3.IntegrityError,)
+if USE_POSTGRES:
+    import psycopg
+
+    INTEGRITY_ERRORS += (psycopg.IntegrityError,)
+
+
+class _Row(dict):
+    """صف يدعم الوصول بالاسم وبالرقم مثل sqlite3.Row."""
+
+    def __init__(self, columns, values):
+        super().__init__(zip(columns, values))
+        self._values = tuple(values)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return super().__getitem__(key)
+
+    def __iter__(self):
+        return iter(self._values)
+
+
+def _pg_row_factory(cursor):
+    columns = [c.name for c in cursor.description] if cursor.description else []
+    return lambda values: _Row(columns, values)
+
+
+class PgConnection:
+    """واجهة مطابقة لما يستخدمه التطبيق من sqlite3.Connection."""
+
+    def __init__(self):
+        self._conn = psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=10)
+        self._conn.execute(f"SET search_path TO {PG_SCHEMA}")
+
+    def execute(self, sql: str, params=()):
+        if sql.strip().upper() == "BEGIN IMMEDIATE":
+            self._conn.execute("BEGIN")
+            return self._conn.execute("SELECT pg_advisory_xact_lock(%s)", (PG_LOCK_KEY,))
+        cursor = self._conn.cursor(row_factory=_pg_row_factory)
+        cursor.execute(sql.replace("?", "%s"), params or None)
+        return cursor
+
+    def executescript(self, script: str) -> None:
+        self._conn.execute(script)
+
+    @property
+    def in_transaction(self) -> bool:
+        return self._conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+def connect():
+    if USE_POSTGRES:
+        return PgConnection()
     conn = sqlite3.connect(DB_PATH, timeout=15, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
 
-def get_db() -> sqlite3.Connection:
+def get_db():
     if "db" not in g:
         g.db = connect()
     return g.db
@@ -309,7 +371,25 @@ def close_db(_exc):
         db.close()
 
 
+def init_db_postgres() -> None:
+    conn = connect()
+    conn.executescript(
+        f"CREATE SCHEMA IF NOT EXISTS {PG_SCHEMA};"
+        + SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+    )
+    for column, kind in EXTRA_COLUMNS.items():
+        conn.execute(f"ALTER TABLE registrations ADD COLUMN IF NOT EXISTS {column} {kind}")
+    for key, value in DEFAULT_SETTINGS.items():
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING", (key, value)
+        )
+    conn.close()
+
+
 def init_db() -> None:
+    if USE_POSTGRES:
+        init_db_postgres()
+        return
     conn = connect()
     # قواعد بيانات الإصدار الأول كانت تمنع تكرار الرقم القومي نهائيًا؛ الآن يُسمح
     # بطلب جديد إذا كان السابق موقوفًا أو قديمًا، فيُعاد بناء الجدول بدون هذا القيد.
@@ -334,7 +414,9 @@ def init_db() -> None:
         conn.execute("DROP TABLE registrations_old")
         conn.execute("COMMIT")
     for key, value in DEFAULT_SETTINGS.items():
-        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING", (key, value)
+        )
     conn.close()
 
 
@@ -344,7 +426,11 @@ DEFAULT_CLOSED_MESSAGE = "التسجيل مغلق مؤقتًا، يرجى الم
 def save_settings(values: dict) -> None:
     conn = get_db()
     for key, value in values.items():
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?)"
+            " ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
 
 
 def get_settings() -> dict:
@@ -413,7 +499,7 @@ def slot_for(seq: int, capacity: int, settings: dict) -> tuple[str, str]:
     return _hhmm(slot_start), _hhmm(min(slot_start + step, end))
 
 
-def day_capacity(conn: sqlite3.Connection, day: date, settings: dict) -> int:
+def day_capacity(conn, day: date, settings: dict) -> int:
     row = conn.execute(
         "SELECT capacity, closed FROM day_overrides WHERE day = ?", (day.isoformat(),)
     ).fetchone()
@@ -424,7 +510,7 @@ def day_capacity(conn: sqlite3.Connection, day: date, settings: dict) -> int:
     return row["capacity"] if row["capacity"] is not None else settings["capacity"]
 
 
-def find_open_day(conn: sqlite3.Connection, settings: dict):
+def find_open_day(conn, settings: dict):
     """أول يوم استقبال قادم ما زال به أماكن: (اليوم، السعة) أو None."""
     if not settings["is_open"] or not settings["weekdays"]:
         return None
@@ -753,7 +839,7 @@ def register():
             list(record.values()),
         )
         conn.execute("COMMIT")
-    except sqlite3.IntegrityError:
+    except INTEGRITY_ERRORS:
         if conn.in_transaction:
             conn.execute("ROLLBACK")
         errors["student_nid"] = "تعذر إتمام التسجيل. برجاء المحاولة مرة أخرى."
@@ -884,10 +970,10 @@ def admin_home():
     open_day = find_open_day(conn, settings)
     stats = conn.execute(
         """SELECT
-               COALESCE(SUM(status = 'active' AND day >= ?), 0) AS upcoming,
-               COALESCE(SUM(status = 'active' AND day = ?), 0) AS today,
-               COALESCE(SUM(received_at LIKE ?), 0) AS received_today,
-               COALESCE(SUM(received_at IS NOT NULL), 0) AS received
+               COALESCE(SUM(CASE WHEN status = 'active' AND day >= ? THEN 1 ELSE 0 END), 0) AS upcoming,
+               COALESCE(SUM(CASE WHEN status = 'active' AND day = ? THEN 1 ELSE 0 END), 0) AS today,
+               COALESCE(SUM(CASE WHEN received_at LIKE ? THEN 1 ELSE 0 END), 0) AS received_today,
+               COALESCE(SUM(CASE WHEN received_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS received
            FROM registrations""",
         (today.isoformat(), today.isoformat(), today.isoformat() + "%"),
     ).fetchone()
@@ -979,7 +1065,8 @@ def admin_day_update(day: str):
     capacity = min(int(raw), 5000) if raw else None
     closed = 1 if request.form.get("closed") else 0
     get_db().execute(
-        "INSERT OR REPLACE INTO day_overrides (day, capacity, closed) VALUES (?, ?, ?)",
+        "INSERT INTO day_overrides (day, capacity, closed) VALUES (?, ?, ?)"
+        " ON CONFLICT (day) DO UPDATE SET capacity = excluded.capacity, closed = excluded.closed",
         (day, capacity, closed),
     )
     flash(f"تم تحديث يوم {fmt_day(day)}.")
@@ -1187,6 +1274,17 @@ def handle_error(error):
 
 
 init_db()
+
+if USE_POSTGRES and not os.environ.get("SECRET_KEY"):
+    _conn = connect()
+    _conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('secret_key', ?) ON CONFLICT (key) DO NOTHING",
+        (secrets.token_hex(32),),
+    )
+    app.config["SECRET_KEY"] = _conn.execute(
+        "SELECT value FROM settings WHERE key = 'secret_key'"
+    ).fetchone()[0]
+    _conn.close()
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=int(os.environ.get("PORT", 5050)), debug=False)

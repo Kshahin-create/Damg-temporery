@@ -2,4 +2,5 @@ Flask>=3.0
 openpyxl>=3.1
 python-barcode>=0.15
 tzdata
+psycopg[binary]>=3.2
 gunicorn>=22.0; platform_system != "Windows"
